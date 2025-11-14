@@ -1,16 +1,5 @@
-# carrier
+# Carrier
 
-A new Flutter project.
+Carrier is a mobile application that allow a user to look for an available carrier vehicle at the moment based on their location for cargo transportation,
+Users can track truck location and package status.
 
-## Getting Started
-
-This project is a starting point for a Flutter application.
-
-A few resources to get you started if this is your first Flutter project:
-
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
-
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.

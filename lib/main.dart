@@ -14,7 +14,10 @@ class CarrierApp extends StatelessWidget {
       title: 'Carrier App',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFFFF6E00)),
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: const Color(0xFFFF6E00),
+          primary: const Color(0xFFFF6E00)
+        ),
         useMaterial3: true,
         fontFamily: 'Fira Sans Condensed',
       ),

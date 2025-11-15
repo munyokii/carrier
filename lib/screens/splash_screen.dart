@@ -1,3 +1,4 @@
+import 'package:carrier/screens/login_screen.dart';
 import 'package:flutter/material.dart';
 
 class OnboardingContent {
@@ -81,7 +82,6 @@ class _SplashScreenState extends State<SplashScreen> {
                           flex: 2,
                           child: Container(
                             alignment: Alignment.bottomCenter,
-                            // USE Image.asset(...) HERE
                             child: Image.asset(
                               contents[i].image,
                               height: 300,
@@ -131,8 +131,10 @@ class _SplashScreenState extends State<SplashScreen> {
               child: ElevatedButton(
                 onPressed: () {
                   if (_currentIndex == contents.length - 1) {
-                    // TODO: add navigation to Login Screen here
-                    print("Navigate to Next Screen");
+                    Navigator.pushReplacement(
+                      context,
+                      MaterialPageRoute(builder: (context) => const LoginScreen()),
+                    );
                   } else {
                     _controller.nextPage(
                       duration: const Duration(milliseconds: 300),

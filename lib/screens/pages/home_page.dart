@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:carrier/screens/login_screen.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:carrier/screens/pages/find_carrier_screen.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -234,9 +235,11 @@ class _HomePageState extends State<HomePage> {
                 subtitle: 'Available now',
                 color: primaryColor,
                 onTap: () {
-                  // TODO: Navigate to find carrier
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Find Carrier feature coming soon!')),
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const FindCarrierScreen(),
+                    ),
                   );
                 },
               ),

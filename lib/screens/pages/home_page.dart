@@ -3,6 +3,7 @@ import 'package:carrier/screens/login_screen.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:carrier/screens/pages/find_carrier_screen.dart';
+import 'package:carrier/screens/pages/track_package_screen.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -253,9 +254,11 @@ class _HomePageState extends State<HomePage> {
                 subtitle: 'Real-time',
                 color: Colors.blue,
                 onTap: () {
-                  // TODO: Navigate to track package
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Track Package feature coming soon!')),
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const TrackPackageScreen(),
+                    ),
                   );
                 },
               ),
@@ -273,9 +276,12 @@ class _HomePageState extends State<HomePage> {
                 subtitle: 'Schedule now',
                 color: Colors.green,
                 onTap: () {
-                  // TODO: Navigate to book delivery
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Book Delivery feature coming soon!')),
+                  // Navigate to Find Carrier screen first to select a carrier, then book delivery
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const FindCarrierScreen(),
+                    ),
                   );
                 },
               ),

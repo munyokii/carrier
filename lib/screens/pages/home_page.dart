@@ -295,9 +295,12 @@ class _HomePageState extends State<HomePage> {
                 subtitle: 'View all',
                 color: Colors.purple,
                 onTap: () {
-                  // TODO: Navigate to orders
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('My Orders feature coming soon!')),
+                  // Navigate to Track Package screen which shows all orders/bookings
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const TrackPackageScreen(),
+                    ),
                   );
                 },
               ),

@@ -48,7 +48,9 @@ class BookingModel {
     this.currentLongitude,
   });
 
-  // Create BookingModel from Firestore document
+  // --- Firestore Serialization Methods ---
+
+  // 1. Create BookingModel from Firestore document (Reading Data)
   factory BookingModel.fromFirestore(Map<String, dynamic> data, String id) {
     return BookingModel(
       id: id,
@@ -65,8 +67,10 @@ class BookingModel {
       description: data['description'],
       weight: data['weight']?.toDouble(),
       distance: (data['distance'] ?? 0.0).toDouble(),
+      // Handle Timestamp to DateTime conversion
       pickupDateTime: (data['pickupDateTime'] as Timestamp?)?.toDate() ?? DateTime.now(),
       status: data['status'] ?? 'pending',
+      // Handle Timestamp to DateTime conversion
       createdAt: (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
       updatedAt: (data['updatedAt'] as Timestamp?)?.toDate(),
       currentLocation: data['currentLocation'],
@@ -74,6 +78,37 @@ class BookingModel {
       currentLongitude: data['currentLongitude']?.toDouble(),
     );
   }
+
+  // 2. Convert BookingModel to a Map for Firestore (Writing Data)
+  Map<String, dynamic> toMap() {
+    return {
+      'userId': userId,
+      'carrierId': carrierId,
+      'carrierName': carrierName,
+      'vehicleType': vehicleType,
+      'pickupAddress': pickupAddress,
+      'pickupLatitude': pickupLatitude,
+      'pickupLongitude': pickupLongitude,
+      'deliveryAddress': deliveryAddress,
+      'deliveryLatitude': deliveryLatitude,
+      'deliveryLongitude': deliveryLongitude,
+      'description': description,
+      'weight': weight,
+      'distance': distance,
+      // Convert DateTime to Firestore Timestamp
+      'pickupDateTime': Timestamp.fromDate(pickupDateTime),
+      'status': status,
+      // Convert DateTime to Firestore Timestamp
+      'createdAt': Timestamp.fromDate(createdAt),
+      // Only convert if not null
+      'updatedAt': updatedAt != null ? Timestamp.fromDate(updatedAt!) : null,
+      'currentLocation': currentLocation,
+      'currentLatitude': currentLatitude,
+      'currentLongitude': currentLongitude,
+    };
+  }
+
+  // --- Utility Getters (UI Logic) ---
 
   String get statusDisplayName {
     switch (status) {
@@ -143,4 +178,3 @@ class BookingModel {
     }
   }
 }
-

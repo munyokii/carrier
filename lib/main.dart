@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'screens/splash_screen.dart';
+import 'screens/logo_splash.dart';
 
 import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
@@ -30,7 +30,7 @@ class CarrierApp extends StatelessWidget {
         useMaterial3: true,
         fontFamily: 'Fira Sans Condensed',
       ),
-      home: const SplashScreen(),
+      home: const LogoSplash(),
     );
   }
 }

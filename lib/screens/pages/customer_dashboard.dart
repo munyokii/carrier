@@ -8,14 +8,14 @@ import 'package:carrier/models/booking_model.dart';
 import 'package:carrier/screens/pages/package_detail_screen.dart';
 import 'package:intl/intl.dart';
 
-class HomePage extends StatefulWidget {
-  const HomePage({super.key});
+class CustomerDashboard extends StatefulWidget {
+  const CustomerDashboard({super.key});
 
   @override
-  State<HomePage> createState() => _HomePageState();
+  State<CustomerDashboard> createState() => _CustomerDashboardState();
 }
 
-class _HomePageState extends State<HomePage> {
+class _CustomerDashboardState extends State<CustomerDashboard> {
   final User? _user = FirebaseAuth.instance.currentUser;
   Map<String, dynamic>? _userData;
 
@@ -29,7 +29,7 @@ class _HomePageState extends State<HomePage> {
     if (_user != null) {
       final doc = await FirebaseFirestore.instance
           .collection('users')
-          .doc(_user!.uid)
+          .doc(_user.uid)
           .get();
       
       if (doc.exists && mounted) {
@@ -439,7 +439,7 @@ class _HomePageState extends State<HomePage> {
             : StreamBuilder<QuerySnapshot>(
                 stream: FirebaseFirestore.instance
                     .collection('bookings')
-                    .where('userId', isEqualTo: _user!.uid)
+                    .where('userId', isEqualTo: _user.uid)
                     .where('status', whereIn: ['pending', 'accepted', 'in_transit'])
                     .snapshots(),
                 builder: (context, snapshot) {
@@ -572,7 +572,7 @@ class _HomePageState extends State<HomePage> {
     BuildContext context,
   ) {
     final dateFormat = DateFormat('MMM dd');
-    final timeFormat = DateFormat('hh:mm a');
+    // final timeFormat = DateFormat('hh:mm a');
 
     return Container(
       width: 280,
@@ -871,7 +871,7 @@ class _HomePageState extends State<HomePage> {
             : StreamBuilder<QuerySnapshot>(
                 stream: FirebaseFirestore.instance
                     .collection('bookings')
-                    .where('userId', isEqualTo: _user!.uid)
+                    .where('userId', isEqualTo: _user.uid)
                     .snapshots(),
                 builder: (context, snapshot) {
                   if (snapshot.connectionState == ConnectionState.waiting) {

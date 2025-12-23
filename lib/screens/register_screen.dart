@@ -4,7 +4,7 @@ import 'package:carrier/widgets/social_login_button.dart';
 
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:carrier/screens/pages/home_page.dart'; 
+import 'package:carrier/screens/pages/customer_dashboard.dart'; 
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -66,7 +66,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
         if (context.mounted) {
           Navigator.pushAndRemoveUntil(
             context,
-            MaterialPageRoute(builder: (context) => const HomePage()),
+            MaterialPageRoute(builder: (context) => const CustomerDashboard()),
             (route) => false,
           );
         }

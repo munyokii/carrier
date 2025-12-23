@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:carrier/models/carrier_model.dart';
-import 'package:carrier/screens/pages/book_delivery_screen.dart';
+import 'package:carrier/screens/pages/customer/book_delivery_screen.dart';
 
 class CarrierDetailScreen extends StatelessWidget {
   final CarrierModel carrier;

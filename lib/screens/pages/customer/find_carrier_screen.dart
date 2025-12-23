@@ -5,7 +5,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:app_settings/app_settings.dart';
 import 'package:carrier/models/carrier_model.dart';
-import 'package:carrier/screens/pages/carrier_detail_screen.dart';
+import 'package:carrier/screens/pages/customer/carrier_detail_screen.dart';
 
 class FindCarrierScreen extends StatefulWidget {
   const FindCarrierScreen({super.key});

@@ -3,7 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/intl.dart';
 import 'package:carrier/models/booking_model.dart';
-import 'package:carrier/screens/pages/package_detail_screen.dart';
+import 'package:carrier/screens/pages/customer/package_detail_screen.dart';
 
 class TrackPackageScreen extends StatefulWidget {
   const TrackPackageScreen({super.key});

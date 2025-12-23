@@ -1,3 +1,4 @@
+import 'package:carrier/screens/pages/admin_dashboard.dart';
 import 'package:flutter/material.dart';
 import 'package:carrier/screens/register_screen.dart';
 import 'package:carrier/widgets/custom_textfield.dart';
@@ -25,7 +26,6 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _isLoading = false;
   bool _isPasswordObscured = true;
   
-  // Track the selected role - Default is Customer
   UserRole _selectedRole = UserRole.customer;
 
   @override
@@ -38,32 +38,39 @@ class _LoginScreenState extends State<LoginScreen> {
   Future<void> _login() async {
     if (!_formKey.currentState!.validate()) return;
 
+    final email = _emailController.text.trim();
+    final password = _passwordController.text.trim();
+
+    if (_selectedRole == UserRole.stationAdmin) {
+      if (!email.endsWith('@swiftline.ke')) {
+        _showError("Only authorized @swiftline.ke emails can login as Admin.");
+        return; 
+      }
+    }
+
     setState(() => _isLoading = true);
 
     try {
-      // 1. Authenticate with Firebase
       await FirebaseAuth.instance.signInWithEmailAndPassword(
-        email: _emailController.text.trim(),
-        password: _passwordController.text.trim(),
+        email: email,
+        password: password,
       );
 
       if (context.mounted) {
-        // 2. Determine destination based on the Toggle selection
         Widget destinationPage;
         
         switch (_selectedRole) {
           case UserRole.customer:
-            destinationPage = const CustomerDashboard(); // Replace with CustomerDashboard()
+            destinationPage = const CustomerDashboard();
             break;
           case UserRole.stationAdmin:
-            destinationPage = const Placeholder(); // Replace with AdminDashboard()
+            destinationPage = const AdminDashboard();
             break;
           case UserRole.driver:
-            destinationPage = const Placeholder(); // Replace with DriverDashboard()
+            destinationPage = const Placeholder();
             break;
         }
 
-        // 3. Navigate and clear navigation stack
         Navigator.pushAndRemoveUntil(
           context,
           MaterialPageRoute(builder: (context) => destinationPage),
@@ -72,8 +79,6 @@ class _LoginScreenState extends State<LoginScreen> {
       }
     } on FirebaseAuthException catch (e) {
       _showError(_getFriendlyErrorMessage(e.code));
-    } catch (e) {
-      _showError("An unexpected error occurred.");
     } finally {
       if (context.mounted) setState(() => _isLoading = false);
     }

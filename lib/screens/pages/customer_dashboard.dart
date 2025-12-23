@@ -2,10 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:carrier/screens/login_screen.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:carrier/screens/pages/find_carrier_screen.dart';
-import 'package:carrier/screens/pages/track_package_screen.dart';
+import 'package:carrier/screens/pages/customer/find_carrier_screen.dart';
+import 'package:carrier/screens/pages/customer/track_package_screen.dart';
 import 'package:carrier/models/booking_model.dart';
-import 'package:carrier/screens/pages/package_detail_screen.dart';
+import 'package:carrier/screens/pages/customer/package_detail_screen.dart';
 import 'package:intl/intl.dart';
 
 class CustomerDashboard extends StatefulWidget {

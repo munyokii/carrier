@@ -5,7 +5,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 
 // Import management screens (to be created)
-// import 'package:carrier/screens/admin/add_station_screen.dart';
+import 'package:carrier/screens/pages/admin/add_station.dart';
 // import 'package:carrier/screens/admin/add_driver_screen.dart';
 
 class AdminDashboard extends StatefulWidget {
@@ -97,13 +97,48 @@ class _AdminDashboardState extends State<AdminDashboard> {
   }
 
   PreferredSizeWidget _buildAppBar(BuildContext context) {
+    final primaryColor = Theme.of(context).colorScheme.primary;
+
     return AppBar(
-      title: const Text("Swiftline Admin", style: TextStyle(fontWeight: FontWeight.bold)),
+      title: const Text(
+        "Swiftline Admin", 
+        style: TextStyle(fontWeight: FontWeight.bold),
+      ),
       actions: [
-        IconButton(onPressed: () {}, icon: const Icon(Icons.search)),
+        // Notification Icon with Badge
+        IconButton(
+          icon: Stack(
+            children: [
+              Icon(Icons.notifications_outlined, color: Colors.grey[800]),
+              Positioned(
+                right: 0,
+                top: 0,
+                child: Container(
+                  width: 8,
+                  height: 8,
+                  decoration: BoxDecoration(
+                    color: primaryColor,
+                    shape: BoxShape.circle,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          onPressed: () {
+            // TODO: Navigate to Admin Notifications
+          },
+        ),
+        
+        // Search Icon
+        IconButton(
+          onPressed: () {}, 
+          icon: Icon(Icons.search, color: Colors.grey[800]),
+        ),
+        
+        // Logout Icon
         IconButton(
           onPressed: () => _handleLogout(context), 
-          icon: const Icon(Icons.logout, color: Colors.red)
+          icon: const Icon(Icons.logout, color: Colors.red),
         ),
       ],
       backgroundColor: Colors.white,
@@ -172,7 +207,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
           "Add Station", 
           Icons.add_business_rounded, 
           primaryColor,
-          () => {} // Navigator.push(context, MaterialPageRoute(builder: (c) => AddStationScreen())),
+          () => Navigator.push(context, MaterialPageRoute(builder: (c) => AddStation())),
         ),
         _buildActionTile(
           context, 

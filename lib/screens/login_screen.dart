@@ -2,8 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:carrier/screens/register_screen.dart';
 import 'package:carrier/widgets/custom_textfield.dart';
 import 'package:carrier/widgets/social_login_button.dart';
+import 'package:carrier/widgets/constants.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:carrier/screens/pages/home_page.dart';
+
+// Import your actual dashboard files here
+import 'package:carrier/screens/pages/customer_dashboard.dart';
+// import 'package:carrier/screens/pages/admin_dashboard.dart';
+// import 'package:carrier/screens/pages/driver_dashboard.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -18,8 +23,10 @@ class _LoginScreenState extends State<LoginScreen> {
   final _passwordController = TextEditingController();
 
   bool _isLoading = false;
-  bool _rememberMe = false;
   bool _isPasswordObscured = true;
+  
+  // Track the selected role - Default is Customer
+  UserRole _selectedRole = UserRole.customer;
 
   @override
   void dispose() {
@@ -29,70 +36,63 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Future<void> _login() async {
-    if (!_formKey.currentState!.validate()) {
-      return;
-    }
+    if (!_formKey.currentState!.validate()) return;
 
-    setState(() {
-      _isLoading = true;
-    });
+    setState(() => _isLoading = true);
 
     try {
+      // 1. Authenticate with Firebase
       await FirebaseAuth.instance.signInWithEmailAndPassword(
         email: _emailController.text.trim(),
         password: _passwordController.text.trim(),
       );
 
       if (context.mounted) {
+        // 2. Determine destination based on the Toggle selection
+        Widget destinationPage;
+        
+        switch (_selectedRole) {
+          case UserRole.customer:
+            destinationPage = const CustomerDashboard(); // Replace with CustomerDashboard()
+            break;
+          case UserRole.stationAdmin:
+            destinationPage = const Placeholder(); // Replace with AdminDashboard()
+            break;
+          case UserRole.driver:
+            destinationPage = const Placeholder(); // Replace with DriverDashboard()
+            break;
+        }
+
+        // 3. Navigate and clear navigation stack
         Navigator.pushAndRemoveUntil(
           context,
-          MaterialPageRoute(builder: (context) => const HomePage()),
+          MaterialPageRoute(builder: (context) => destinationPage),
           (route) => false,
         );
       }
     } on FirebaseAuthException catch (e) {
-      String errorMessage = 'An error occurred. Please try again.';
-
-      switch (e.code) {
-        case 'invalid-credential':
-          errorMessage = 'Invalid email or password. Please check and try again.';
-          break;
-        case 'invalid-email':
-          errorMessage = 'The email address you entered is not valid.';
-          break;
-        case 'user-disabled':
-          errorMessage = 'This user account has been disabled.';
-          break;
-        case 'too-many-requests':
-          errorMessage = 'Too many login attempts. Please try again later.';
-          break;
-        case 'operation-not-allowed':
-          errorMessage = 'Email/Password login is not enabled.';
-          break;
-        default:
-          print('Firebase Login Error: ${e.message}');
-          errorMessage = 'An unknown error occurred. Please try again.';
-      }
-
-      _showError(errorMessage);
+      _showError(_getFriendlyErrorMessage(e.code));
+    } catch (e) {
+      _showError("An unexpected error occurred.");
     } finally {
-      if (context.mounted) {
-        setState(() {
-          _isLoading = false;
-        });
-      }
+      if (context.mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  String _getFriendlyErrorMessage(String code) {
+    switch (code) {
+      case 'user-not-found': return 'No user found for that email.';
+      case 'wrong-password': return 'Wrong password provided.';
+      case 'invalid-credential': return 'Invalid login details.';
+      case 'too-many-requests': return 'Too many attempts. Please try later.';
+      default: return 'Login failed. Please try again.';
     }
   }
 
   void _showError(String message) {
-    if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(message),
-          backgroundColor: Colors.red,
-        ),
-      );
-    }
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message), backgroundColor: Colors.red),
+    );
   }
 
   @override
@@ -110,96 +110,80 @@ class _LoginScreenState extends State<LoginScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const SizedBox(height: 60),
+                  const SizedBox(height: 40),
                   Text(
                     "Welcome Back",
                     style: TextStyle(
-                      fontSize: 32,
-                      fontWeight: FontWeight.bold,
+                      fontSize: 32, 
+                      fontWeight: FontWeight.bold, 
                       color: primaryColor,
                     ),
                   ),
-                  Text(
-                    "Log in to manage your deliveries.",
-                    style: TextStyle(
-                      fontSize: 16,
-                      color: Colors.grey[700],
+                  const Text(
+                    "Select your account type to continue.",
+                    style: TextStyle(fontSize: 16, color: Colors.grey),
+                  ),
+
+                  const SizedBox(height: 30),
+
+                  // ROLE TOGGLE SECTION
+                  Center(
+                    child: SegmentedButton<UserRole>(
+                      segments: const [
+                        ButtonSegment(
+                          value: UserRole.customer,
+                          label: Text('Customer'),
+                          icon: Icon(Icons.person_outline),
+                        ),
+                        ButtonSegment(
+                          value: UserRole.stationAdmin,
+                          label: Text('Admin'),
+                          icon: Icon(Icons.admin_panel_settings_outlined),
+                        ),
+                        ButtonSegment(
+                          value: UserRole.driver,
+                          label: Text('Driver'),
+                          icon: Icon(Icons.local_shipping_outlined),
+                        ),
+                      ],
+                      selected: {_selectedRole},
+                      onSelectionChanged: (Set<UserRole> newSelection) {
+                        setState(() {
+                          _selectedRole = newSelection.first;
+                        });
+                      },
+                      style: SegmentedButton.styleFrom(
+                        selectedBackgroundColor: primaryColor,
+                        selectedForegroundColor: Colors.white,
+                        side: BorderSide(color: primaryColor.withOpacity(0.5)),
+                      ),
                     ),
                   ),
-                  const SizedBox(height: 40),
-                  
+
+                  const SizedBox(height: 30),
+
                   CustomTextField(
                     hintText: "Email",
                     icon: Icons.email_outlined,
                     controller: _emailController,
-                    validator: (value) {
-                      if (value == null || value.trim().isEmpty) {
-                        return 'Please enter your email';
-                      }
-                      if (!RegExp(r'\S+@\S+\.\S+').hasMatch(value)) {
-                        return 'Please enter a valid email address';
-                      }
-                      return null;
-                    },
+                    validator: (value) => (value == null || value.isEmpty) ? 'Enter email' : null,
                   ),
                   const SizedBox(height: 20),
-
                   CustomTextField(
                     hintText: "Password",
                     icon: Icons.lock_outline,
                     controller: _passwordController,
                     obscureText: _isPasswordObscured,
-                    validator: (value) {
-                      if (value == null || value.trim().isEmpty) {
-                        return 'Please enter your password';
-                      }
-                      return null;
-                    },
                     suffixIcon: IconButton(
-                      icon: Icon(
-                        _isPasswordObscured
-                            ? Icons.visibility_off
-                            : Icons.visibility,
-                      ),
-                      onPressed: () {
-                        setState(() {
-                          _isPasswordObscured = !_isPasswordObscured;
-                        });
-                      },
+                      icon: Icon(_isPasswordObscured ? Icons.visibility_off : Icons.visibility),
+                      onPressed: () => setState(() => _isPasswordObscured = !_isPasswordObscured),
                     ),
+                    validator: (value) => (value == null || value.isEmpty) ? 'Enter password' : null,
                   ),
-                  const SizedBox(height: 20),
-                  
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Row(
-                        children: [
-                          Checkbox(
-                            value: _rememberMe,
-                            onChanged: (val) {
-                              setState(() {
-                                _rememberMe = val ?? false;
-                              });
-                            },
-                            activeColor: primaryColor,
-                          ),
-                          const Text("Remember me"),
-                        ],
-                      ),
-                      TextButton(
-                        onPressed: () {
-                          // TODO: Implement Forgot Password
-                        },
-                        child: Text(
-                          "Forgot Password?",
-                          style: TextStyle(color: primaryColor),
-                        ),
-                      ),
-                    ],
-                  ),
+
                   const SizedBox(height: 30),
-                  
+
+                  // LOGIN BUTTON
                   SizedBox(
                     width: double.infinity,
                     height: 55,
@@ -208,67 +192,39 @@ class _LoginScreenState extends State<LoginScreen> {
                       style: ElevatedButton.styleFrom(
                         backgroundColor: primaryColor,
                         foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(100),
-                        ),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(100)),
+                        elevation: 0,
                       ),
-                      child: _isLoading
-                          ? const CircularProgressIndicator(
-                              valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                            )
-                          : const Text(
-                              "Login",
-                              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                            ),
+                      child: _isLoading 
+                        ? const CircularProgressIndicator(color: Colors.white) 
+                        : const Text("Login", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                     ),
                   ),
+
                   const SizedBox(height: 40),
-                  
                   const Row(
-                     children: [
+                    children: [
                       Expanded(child: Divider()),
-                      Padding(
-                        padding: EdgeInsets.symmetric(horizontal: 10),
-                        child: Text("Or continue with"),
-                      ),
+                      Padding(padding: EdgeInsets.symmetric(horizontal: 10), child: Text("Or")),
                       Expanded(child: Divider()),
                     ],
                   ),
                   const SizedBox(height: 30),
                   const Row(
-                     mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                     children: [
-                      SocialLoginButton(
-                        icon: Icons.g_mobiledata,
-                        label: "Google",
-                      ),
-                      SocialLoginButton(
-                        icon: Icons.apple,
-                        label: "Apple",
-                      ),
+                      SocialLoginButton(icon: Icons.g_mobiledata, label: "Google"),
+                      SocialLoginButton(icon: Icons.apple, label: "Apple"),
                     ],
                   ),
                   const SizedBox(height: 40),
-                  
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       const Text("Don't have an account? "),
                       GestureDetector(
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                                builder: (context) => const RegisterScreen()),
-                          );
-                        },
-                        child: Text(
-                          "Register",
-                          style: TextStyle(
-                            color: primaryColor,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
+                        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const RegisterScreen())),
+                        child: Text("Register", style: TextStyle(color: primaryColor, fontWeight: FontWeight.bold)),
                       ),
                     ],
                   )

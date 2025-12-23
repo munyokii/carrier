@@ -41,8 +41,8 @@ class DefaultFirebaseOptions {
   }
 
   static const FirebaseOptions web = FirebaseOptions(
-    apiKey: 'AIzaSyBoATrZhVHaXK_pEXJjjxXVpNErJ536aHU',
-    appId: '1:381990099686:web:e2c8269c313b3dd6f6f927',
+    apiKey: const String.fromEnvironment('WEB_API_KEY'),
+    appId: const String.fromEnvironment('WEB_APP_ID'),
     messagingSenderId: '381990099686',
     projectId: 'carrier-6d7c1',
     authDomain: 'carrier-6d7c1.firebaseapp.com',
@@ -50,16 +50,16 @@ class DefaultFirebaseOptions {
   );
 
   static const FirebaseOptions android = FirebaseOptions(
-    apiKey: 'AIzaSyCbL2iIdEjUBU_OLefkfIk3uTIaEtUghzM',
-    appId: '1:381990099686:android:7d4c95f2039c328af6f927',
+    apiKey: const String.fromEnvironment('ANDROID_API_KEY'),
+    appId: const String.fromEnvironment('ANDROID_APP_ID'),
     messagingSenderId: '381990099686',
     projectId: 'carrier-6d7c1',
     storageBucket: 'carrier-6d7c1.firebasestorage.app',
   );
 
   static const FirebaseOptions ios = FirebaseOptions(
-    apiKey: 'AIzaSyD7otd3nTN63ydPyIBR9BmT0jvZ2xkwO6w',
-    appId: '1:381990099686:ios:3ed83e597070621ef6f927',
+    apiKey: const String.fromEnvironment('IOS_API_KEY'),
+    appId: const String.fromEnvironment('IOS_APP_ID'),
     messagingSenderId: '381990099686',
     projectId: 'carrier-6d7c1',
     storageBucket: 'carrier-6d7c1.firebasestorage.app',
@@ -67,8 +67,8 @@ class DefaultFirebaseOptions {
   );
 
   static const FirebaseOptions macos = FirebaseOptions(
-    apiKey: 'AIzaSyD7otd3nTN63ydPyIBR9BmT0jvZ2xkwO6w',
-    appId: '1:381990099686:ios:3ed83e597070621ef6f927',
+    apiKey: const String.fromEnvironment('MACOS_API_KEY'),
+    appId: const String.fromEnvironment('MACOS_APP_ID'),
     messagingSenderId: '381990099686',
     projectId: 'carrier-6d7c1',
     storageBucket: 'carrier-6d7c1.firebasestorage.app',
@@ -76,8 +76,8 @@ class DefaultFirebaseOptions {
   );
 
   static const FirebaseOptions windows = FirebaseOptions(
-    apiKey: 'AIzaSyBoATrZhVHaXK_pEXJjjxXVpNErJ536aHU',
-    appId: '1:381990099686:web:052d0b76310edfd4f6f927',
+    apiKey: const String.fromEnvironment('WINDOW_API_KEY'),
+    appId: const String.fromEnvironment('WINDOW_API_KEY'),
     messagingSenderId: '381990099686',
     projectId: 'carrier-6d7c1',
     authDomain: 'carrier-6d7c1.firebaseapp.com',

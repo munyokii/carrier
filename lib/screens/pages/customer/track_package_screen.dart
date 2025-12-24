@@ -232,42 +232,69 @@ class _TrackPackageScreenState extends State<TrackPackageScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Header with Status
+              // Header with Package ID and Status
               Row(
                 children: [
-                  // Status Icon
+                  // Package Icon
                   Container(
-                    padding: const EdgeInsets.all(8),
+                    padding: const EdgeInsets.all(10),
                     decoration: BoxDecoration(
-                      color: booking.statusColor.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(8),
+                      color: primaryColor.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(10),
                     ),
                     child: Icon(
-                      booking.statusIcon,
-                      color: booking.statusColor,
+                      Icons.inventory_2_outlined,
+                      color: primaryColor,
                       size: 24,
                     ),
                   ),
                   const SizedBox(width: 12),
-                  // Booking Info
+                  // Package Info
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          booking.carrierName,
+                          'Package #${booking.id.substring(0, 8).toUpperCase()}',
                           style: const TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.bold,
                           ),
                         ),
                         const SizedBox(height: 4),
-                        Text(
-                          booking.vehicleType,
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: Colors.grey[600],
-                          ),
+                        Row(
+                          children: [
+                            Icon(
+                              Icons.local_shipping,
+                              size: 14,
+                              color: Colors.grey[600],
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              booking.carrierName,
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: Colors.grey[600],
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Container(
+                              width: 4,
+                              height: 4,
+                              decoration: BoxDecoration(
+                                color: Colors.grey[400],
+                                shape: BoxShape.circle,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              booking.vehicleType,
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: Colors.grey[600],
+                              ),
+                            ),
+                          ],
                         ),
                       ],
                     ),
@@ -285,13 +312,24 @@ class _TrackPackageScreenState extends State<TrackPackageScreen> {
                         color: booking.statusColor.withOpacity(0.3),
                       ),
                     ),
-                    child: Text(
-                      booking.statusDisplayName,
-                      style: TextStyle(
-                        color: booking.statusColor,
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
-                      ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          booking.statusIcon,
+                          size: 14,
+                          color: booking.statusColor,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          booking.statusDisplayName,
+                          style: TextStyle(
+                            color: booking.statusColor,
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ],
@@ -299,13 +337,86 @@ class _TrackPackageScreenState extends State<TrackPackageScreen> {
 
               const SizedBox(height: 16),
 
+              // Package Details Section
+              if (booking.weight != null || booking.description != null)
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.grey[50],
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Row(
+                    children: [
+                      if (booking.weight != null) ...[
+                        Row(
+                          children: [
+                            Icon(
+                              Icons.scale_outlined,
+                              size: 16,
+                              color: Colors.grey[700],
+                            ),
+                            const SizedBox(width: 6),
+                            Text(
+                              '${booking.weight!.toStringAsFixed(1)} kg',
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: Colors.grey[700],
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ],
+                        ),
+                        if (booking.description != null)
+                          const SizedBox(width: 16),
+                      ],
+                      if (booking.description != null)
+                        Expanded(
+                          child: Row(
+                            children: [
+                              Icon(
+                                Icons.description_outlined,
+                                size: 16,
+                                color: Colors.grey[700],
+                              ),
+                              const SizedBox(width: 6),
+                              Expanded(
+                                child: Text(
+                                  booking.description!,
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    color: Colors.grey[700],
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+
+              if (booking.weight != null || booking.description != null)
+                const SizedBox(height: 16),
+
               // Progress Indicator
               _buildProgressIndicator(booking, primaryColor),
 
               const SizedBox(height: 16),
 
+              // Divider
+              Divider(
+                color: Colors.grey[200],
+                height: 1,
+              ),
+
+              const SizedBox(height: 16),
+
               // Route Info
               Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   // Pickup
                   Expanded(
@@ -314,23 +425,30 @@ class _TrackPackageScreenState extends State<TrackPackageScreen> {
                       children: [
                         Row(
                           children: [
-                            Icon(
-                              Icons.location_on,
-                              size: 16,
-                              color: Colors.orange,
+                            Container(
+                              padding: const EdgeInsets.all(4),
+                              decoration: BoxDecoration(
+                                color: Colors.orange.withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: Icon(
+                                Icons.location_on,
+                                size: 14,
+                                color: Colors.orange[700],
+                              ),
                             ),
-                            const SizedBox(width: 4),
+                            const SizedBox(width: 6),
                             Text(
-                              'From',
+                              'Pickup',
                               style: TextStyle(
                                 fontSize: 12,
                                 color: Colors.grey[600],
-                                fontWeight: FontWeight.w500,
+                                fontWeight: FontWeight.w600,
                               ),
                             ),
                           ],
                         ),
-                        const SizedBox(height: 4),
+                        const SizedBox(height: 6),
                         Text(
                           booking.pickupAddress,
                           style: const TextStyle(
@@ -343,13 +461,17 @@ class _TrackPackageScreenState extends State<TrackPackageScreen> {
                       ],
                     ),
                   ),
-                  const SizedBox(width: 8),
-                  Icon(
-                    Icons.arrow_forward,
-                    color: Colors.grey[400],
-                    size: 20,
+                  const SizedBox(width: 12),
+                  // Arrow
+                  Padding(
+                    padding: const EdgeInsets.only(top: 8),
+                    child: Icon(
+                      Icons.arrow_forward,
+                      color: Colors.grey[400],
+                      size: 20,
+                    ),
                   ),
-                  const SizedBox(width: 8),
+                  const SizedBox(width: 12),
                   // Delivery
                   Expanded(
                     child: Column(
@@ -357,23 +479,30 @@ class _TrackPackageScreenState extends State<TrackPackageScreen> {
                       children: [
                         Row(
                           children: [
-                            Icon(
-                              Icons.location_city,
-                              size: 16,
-                              color: Colors.green,
+                            Container(
+                              padding: const EdgeInsets.all(4),
+                              decoration: BoxDecoration(
+                                color: Colors.green.withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: Icon(
+                                Icons.location_city,
+                                size: 14,
+                                color: Colors.green[700],
+                              ),
                             ),
-                            const SizedBox(width: 4),
+                            const SizedBox(width: 6),
                             Text(
-                              'To',
+                              'Delivery',
                               style: TextStyle(
                                 fontSize: 12,
                                 color: Colors.grey[600],
-                                fontWeight: FontWeight.w500,
+                                fontWeight: FontWeight.w600,
                               ),
                             ),
                           ],
                         ),
-                        const SizedBox(height: 4),
+                        const SizedBox(height: 6),
                         Text(
                           booking.deliveryAddress,
                           style: const TextStyle(
@@ -392,36 +521,88 @@ class _TrackPackageScreenState extends State<TrackPackageScreen> {
               const SizedBox(height: 16),
 
               // Footer Info
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Row(
-                    children: [
-                      Icon(Icons.calendar_today, size: 14, color: Colors.grey[600]),
-                      const SizedBox(width: 4),
-                      Text(
-                        'Pickup: ${dateFormat.format(booking.pickupDateTime)} ${timeFormat.format(booking.pickupDateTime)}',
-                        style: TextStyle(
-                          fontSize: 12,
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.grey[50],
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Expanded(
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.calendar_today_outlined,
+                            size: 14,
+                            color: Colors.grey[600],
+                          ),
+                          const SizedBox(width: 6),
+                          Flexible(
+                            child: Text(
+                              '${dateFormat.format(booking.pickupDateTime)}',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.grey[700],
+                                fontWeight: FontWeight.w500,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Container(
+                      width: 1,
+                      height: 20,
+                      color: Colors.grey[300],
+                    ),
+                    const SizedBox(width: 12),
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.access_time_outlined,
+                          size: 14,
                           color: Colors.grey[600],
                         ),
-                      ),
-                    ],
-                  ),
-                  Row(
-                    children: [
-                      Icon(Icons.straighten, size: 14, color: Colors.grey[600]),
-                      const SizedBox(width: 4),
-                      Text(
-                        '${booking.distance.toStringAsFixed(1)} km',
-                        style: TextStyle(
-                          fontSize: 12,
+                        const SizedBox(width: 6),
+                        Text(
+                          timeFormat.format(booking.pickupDateTime),
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey[700],
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
+                    Container(
+                      width: 1,
+                      height: 20,
+                      color: Colors.grey[300],
+                    ),
+                    const SizedBox(width: 12),
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.straighten,
+                          size: 14,
                           color: Colors.grey[600],
                         ),
-                      ),
-                    ],
-                  ),
-                ],
+                        const SizedBox(width: 6),
+                        Text(
+                          '${booking.distance.toStringAsFixed(1)} km',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey[700],
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
               ),
             ],
           ),

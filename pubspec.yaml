@@ -37,26 +37,29 @@ dependencies:
   firebase_core: ^4.2.1
   firebase_auth: ^6.1.2
   cloud_firestore: ^6.1.0
-  flutter_map: ^7.0.2
+  flutter_map: ^8.2.2
   latlong2: ^0.9.1
-  geocoding: ^3.0.0
+  geocoding: ^4.0.0
   url_launcher: ^6.2.4
-  app_settings: ^5.2.0
-  intl: ^0.19.0
+  app_settings: ^7.0.0
+  intl: ^0.20.2
   shared_preferences: ^2.2.2
-  geolocator: ^13.0.1
+  geolocator: ^14.0.2
+  image_picker: ^1.2.1
+  firebase_storage: ^13.0.5
+  cloudinary_public: ^0.23.1
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
-  flutter_launcher_icons: ^0.13.1
+  flutter_launcher_icons: ^0.14.4
 
   # The "flutter_lints" package below contains a set of recommended lints to
   # encourage good coding practices. The lint set provided by the package is
   # activated in the `analysis_options.yaml` file located at the root of your
   # package. See that file for information about deactivating specific lint
   # rules and activating additional ones.
-  flutter_lints: ^5.0.0
+  flutter_lints: ^6.0.0
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec

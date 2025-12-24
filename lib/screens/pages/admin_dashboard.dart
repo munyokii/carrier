@@ -2,10 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:carrier/screens/login_screen.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:intl/intl.dart';
+// import 'package:intl/intl.dart';
 
 // Import your station screen
 import 'package:carrier/screens/pages/admin/add_station.dart';
+import 'package:carrier/screens/pages/admin/add_driver.dart';
 
 class AdminDashboard extends StatefulWidget {
   const AdminDashboard({super.key});
@@ -20,7 +21,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
   int totalDrivers = 0;
   int totalStations = 0;
   int activeShipments = 0;
-  bool _isLoading = true;
+  // bool _isLoading = true;
 
   @override
   void initState() {
@@ -44,7 +45,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
           totalDrivers = drivers.count ?? 0;
           totalStations = stations.count ?? 0;
           activeShipments = shipments.count ?? 0;
-          _isLoading = false;
+          // _isLoading = false;
         });
       }
     } catch (e) {
@@ -216,7 +217,8 @@ class _AdminDashboardState extends State<AdminDashboard> {
       children: [
         _buildActionTile(context, "Add Station", Icons.add_business_rounded, primaryColor, 
             () => Navigator.push(context, MaterialPageRoute(builder: (c) => const AddStation()))),
-        _buildActionTile(context, "Add Driver", Icons.person_add_alt_1_rounded, Colors.indigo, () {}),
+        _buildActionTile(context, "Add Driver", Icons.person_add_alt_1_rounded, Colors.indigo,
+            () => Navigator.push(context, MaterialPageRoute(builder: (c) => const AddDriver()))),
         _buildActionTile(context, "All Users", Icons.group_outlined, Colors.teal, () {}),
         _buildActionTile(context, "Reports", Icons.analytics_outlined, Colors.purple, () {}),
       ],

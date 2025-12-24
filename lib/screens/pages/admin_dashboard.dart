@@ -1,11 +1,15 @@
 import 'package:flutter/material.dart';
-import 'package:carrier/screens/login_screen.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart';
 
 // Import your screens
+import 'package:carrier/screens/login_screen.dart';
 import 'package:carrier/screens/pages/admin/add_station.dart';
 import 'package:carrier/screens/pages/admin/add_driver.dart';
+import 'package:carrier/screens/pages/admin/all_drivers.dart';
+import 'package:carrier/screens/pages/admin/driver_detail.dart';
 
 class AdminDashboard extends StatefulWidget {
   const AdminDashboard({super.key});
@@ -16,7 +20,6 @@ class AdminDashboard extends StatefulWidget {
 
 class _AdminDashboardState extends State<AdminDashboard> {
   final User? _user = FirebaseAuth.instance.currentUser;
-  
   int totalDrivers = 0;
   int totalStations = 0;
   int activeShipments = 0;
@@ -50,15 +53,6 @@ class _AdminDashboardState extends State<AdminDashboard> {
     }
   }
 
-  Stream<List<Map<String, dynamic>>> _getRecentData(String collection) {
-    return FirebaseFirestore.instance
-        .collection(collection)
-        .orderBy('createdAt', descending: true)
-        .limit(5)
-        .snapshots()
-        .map((snapshot) => snapshot.docs.map((doc) => {...doc.data(), 'id': doc.id}).toList());
-  }
-
   @override
   Widget build(BuildContext context) {
     final primaryColor = Theme.of(context).colorScheme.primary;
@@ -70,304 +64,294 @@ class _AdminDashboardState extends State<AdminDashboard> {
         onRefresh: _fetchSystemStats,
         child: SingleChildScrollView(
           physics: const AlwaysScrollableScrollPhysics(),
-          padding: const EdgeInsets.all(20),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _buildWelcomeSection(),
-              const SizedBox(height: 25),
-              
-              // 1. Stats Overview
-              _buildSectionTitle("System Overview"),
-              const SizedBox(height: 15),
-              _buildStatsGrid(primaryColor),
-              
-              const SizedBox(height: 30),
-              
-              // 2. Management Actions
-              _buildSectionTitle("Management Actions"),
-              const SizedBox(height: 15),
-              _buildAdminActions(context, primaryColor),
-              
-              const SizedBox(height: 30),
-
-              // 3. Recent Stations Section
-              _buildListHeader("Recent Stations", () {
-                // TODO: Navigator.push(context, MaterialPageRoute(builder: (c) => const AllStationsScreen()));
-              }),
-              const SizedBox(height: 10),
-              _buildStationHorizontalList(),
-              
-              const SizedBox(height: 30),
-
-              // 4. Recent Drivers Section (New)
-              _buildListHeader("Recent Drivers", () {
-                // TODO: Navigator.push(context, MaterialPageRoute(builder: (c) => const AllDriversScreen()));
-              }),
-              const SizedBox(height: 10),
-              _buildDriverHorizontalList(),
-
-              const SizedBox(height: 30),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  // --- SHARED UI COMPONENTS ---
-
-  Widget _buildSectionTitle(String title) {
-    return Text(
-      title,
-      style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, letterSpacing: 0.5),
-    );
-  }
-
-  Widget _buildListHeader(String title, VoidCallback onViewAll) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        _buildSectionTitle(title),
-        TextButton(onPressed: onViewAll, child: const Text("View All")),
-      ],
-    );
-  }
-
-  PreferredSizeWidget _buildAppBar(BuildContext context, Color primaryColor) {
-    return AppBar(
-      title: const Text("Swiftline Admin", style: TextStyle(fontWeight: FontWeight.bold)),
-      backgroundColor: Colors.white,
-      elevation: 0,
-      centerTitle: false,
-      actions: [
-        IconButton(
-          icon: Stack(
-            children: [
-              Icon(Icons.notifications_outlined, color: Colors.grey[800]),
-              Positioned(
-                right: 0, top: 0,
-                child: Container(width: 8, height: 8, decoration: BoxDecoration(color: primaryColor, shape: BoxShape.circle)),
+              Padding(
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildWelcomeSection(),
+                    const SizedBox(height: 25),
+                    _buildStatsGrid(primaryColor),
+                    const SizedBox(height: 30),
+                    _buildSectionTitle("Management Actions"),
+                    const SizedBox(height: 15),
+                    _buildAdminActions(context, primaryColor),
+                  ],
+                ),
               ),
+
+              // --- 1. STATIONS SECTION (MAP CARDS GRID) ---
+              _buildListHeader("Recent Stations", () {
+                // TODO: Navigator.push(context, MaterialPageRoute(builder: (c) => const AllStations()));
+              }),
+              _buildStationCardsRow(),
+              
+              const SizedBox(height: 25),
+
+              // --- 2. DRIVERS SECTION (WHATSAPP STYLE LIST) ---
+              _buildListHeader("Recent Drivers", () {
+                Navigator.push(context, MaterialPageRoute(builder: (c) => const AllDrivers()));
+              }),
+              _buildRecentDriversList(),
+              
+              const SizedBox(height: 30),
             ],
           ),
-          onPressed: () {},
-        ),
-        IconButton(
-          onPressed: () => _handleLogout(context), 
-          icon: const Icon(Icons.logout, color: Colors.red)
-        ),
-      ],
-    );
-  }
-
-  Widget _buildWelcomeSection() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          "Hello, ${_user?.email?.split('@')[0]} 👋",
-          style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-        ),
-        const Text("Monitoring fleet operations and system health."),
-      ],
-    );
-  }
-
-  Widget _buildStatsGrid(Color primaryColor) {
-    return Row(
-      children: [
-        _buildStatCard("Drivers", totalDrivers.toString(), Icons.person, Colors.blue),
-        const SizedBox(width: 12),
-        _buildStatCard("Stations", totalStations.toString(), Icons.hub, Colors.orange),
-        const SizedBox(width: 12),
-        _buildStatCard("Active", activeShipments.toString(), Icons.local_shipping, Colors.green),
-      ],
-    );
-  }
-
-  Widget _buildStatCard(String title, String value, IconData icon, Color color) {
-    return Expanded(
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 10),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(15),
-          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 10)],
-        ),
-        child: Column(
-          children: [
-            Icon(icon, color: color, size: 24),
-            const SizedBox(height: 8),
-            Text(value, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-            Text(title, style: TextStyle(color: Colors.grey[500], fontSize: 11, fontWeight: FontWeight.w600)),
-          ],
         ),
       ),
     );
   }
 
-  Widget _buildAdminActions(BuildContext context, Color primaryColor) {
-    return GridView.count(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      crossAxisCount: 2,
-      crossAxisSpacing: 15,
-      mainAxisSpacing: 15,
-      childAspectRatio: 1.5,
-      children: [
-        _buildActionTile(context, "Add Station", Icons.add_business_rounded, primaryColor, 
-            () => Navigator.push(context, MaterialPageRoute(builder: (c) => const AddStation()))),
-        _buildActionTile(context, "Add Driver", Icons.person_add_alt_1_rounded, Colors.indigo,
-            () => Navigator.push(context, MaterialPageRoute(builder: (c) => const AddDriver()))),
-        _buildActionTile(context, "All Users", Icons.group_outlined, Colors.teal, () {}),
-        _buildActionTile(context, "Reports", Icons.analytics_outlined, Colors.purple, () {}),
-      ],
-    );
-  }
-
-  Widget _buildActionTile(BuildContext context, String title, IconData icon, Color color, VoidCallback onTap) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(20),
-      child: Container(
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: color.withOpacity(0.5), width: 1.5),
-        ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, color: color, size: 28),
-            const SizedBox(height: 8),
-            Text(title, style: TextStyle(color: color, fontWeight: FontWeight.bold, fontSize: 14)),
-          ],
-        ),
-      ),
-    );
-  }
-
-  // --- RECENT STATIONS LIST ---
-  Widget _buildStationHorizontalList() {
-    return StreamBuilder<List<Map<String, dynamic>>>(
-      stream: _getRecentData('stations'),
+  // --- STATION MAP CARDS (GRID STYLE) ---
+  Widget _buildStationCardsRow() {
+    return StreamBuilder<QuerySnapshot>(
+      stream: FirebaseFirestore.instance
+          .collection('stations')
+          .orderBy('createdAt', descending: true)
+          .limit(5)
+          .snapshots(),
       builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const SizedBox(height: 150, child: Center(child: CircularProgressIndicator()));
-        }
-        if (!snapshot.hasData || snapshot.data!.isEmpty) {
-          return _buildEmptyState("No stations found.");
-        }
+        if (!snapshot.hasData) return const Center(child: LinearProgressIndicator());
+        if (snapshot.data!.docs.isEmpty) return _buildEmptyState("No stations found.");
 
         return SizedBox(
-          height: 160,
+          height: 190, 
           child: ListView.builder(
             scrollDirection: Axis.horizontal,
-            itemCount: snapshot.data!.length,
-            itemBuilder: (context, index) => _buildDataCard(snapshot.data![index], isStation: true),
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            itemCount: snapshot.data!.docs.length,
+            itemBuilder: (context, index) {
+              final data = snapshot.data!.docs[index].data() as Map<String, dynamic>;
+              return _buildStationMapCard(data);
+            },
           ),
         );
       },
     );
   }
 
-  // --- RECENT DRIVERS LIST (NEW) ---
-  Widget _buildDriverHorizontalList() {
-    return StreamBuilder<List<Map<String, dynamic>>>(
-      stream: _getRecentData('drivers'),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const SizedBox(height: 150, child: Center(child: CircularProgressIndicator()));
-        }
-        if (!snapshot.hasData || snapshot.data!.isEmpty) {
-          return _buildEmptyState("No drivers registered.");
-        }
-
-        return SizedBox(
-          height: 160,
-          child: ListView.builder(
-            scrollDirection: Axis.horizontal,
-            itemCount: snapshot.data!.length,
-            itemBuilder: (context, index) => _buildDataCard(snapshot.data![index], isStation: false),
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _buildDataCard(Map<String, dynamic> data, {required bool isStation}) {
-    final status = data['status'] ?? 'active';
-    final bool isActive = status.toString().toLowerCase() == 'active';
-    final String title = isStation ? (data['stationName'] ?? 'Unnamed') : (data['fullName'] ?? 'Unnamed');
-    final String subtitle = isStation ? "CODE: ${data['stationCode']}" : "${data['vehicleType'] ?? 'No Vehicle'}";
+  Widget _buildStationMapCard(Map<String, dynamic> data) {
+    final geoPoint = data['coordinates'] as GeoPoint?;
+    final LatLng location = geoPoint != null 
+        ? LatLng(geoPoint.latitude, geoPoint.longitude) 
+        : LatLng(0, 0);
 
     return Container(
-      width: 220,
-      margin: const EdgeInsets.only(right: 15, bottom: 5),
-      padding: const EdgeInsets.all(20),
+      width: 240,
+      margin: const EdgeInsets.only(right: 15, bottom: 8, top: 5),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(25),
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 10, offset: const Offset(0, 5))],
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 8, offset: const Offset(0, 4))],
       ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: (isStation ? Colors.orange : Colors.indigo).withOpacity(0.1), 
-                  shape: BoxShape.circle
+          ClipRRect(
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+            child: SizedBox(
+              height: 100,
+              child: FlutterMap(
+                options: MapOptions(
+                  initialCenter: location,
+                  initialZoom: 13.0,
+                  interactionOptions: const InteractionOptions(flags: InteractiveFlag.none),
                 ),
-                child: Icon(isStation ? Icons.hub_outlined : Icons.person_outline, size: 20, color: isStation ? Colors.orange : Colors.indigo),
+                children: [
+                  TileLayer(
+                    urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                    userAgentPackageName: 'com.swiftline.carrier',
+                  ),
+                  MarkerLayer(
+                    markers: [
+                      Marker(
+                        point: location,
+                        width: 30, height: 30,
+                        child: const Icon(Icons.location_on, color: Colors.red, size: 25),
+                      ),
+                    ],
+                  ),
+                ],
               ),
-              _buildStatusBadge(status, isActive),
-            ],
+            ),
           ),
-          const Spacer(),
-          Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16), maxLines: 1, overflow: TextOverflow.ellipsis),
-          const SizedBox(height: 4),
-          Text(subtitle, style: TextStyle(color: Colors.grey[500], fontSize: 12, fontWeight: FontWeight.w600)),
+          Padding(
+            padding: const EdgeInsets.all(12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Expanded(
+                      child: Text(data['stationName'] ?? 'Unnamed Hub', 
+                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                        maxLines: 1, overflow: TextOverflow.ellipsis),
+                    ),
+                    _buildSmallStatusBadge(data['status'] ?? 'active'),
+                  ],
+                ),
+                Text("Code: ${data['stationCode'] ?? 'N/A'}", 
+                  style: TextStyle(color: Colors.grey[500], fontSize: 11)),
+              ],
+            ),
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildStatusBadge(String status, bool isActive) {
-    Color badgeColor = isActive ? Colors.green : Colors.orange;
-    if (status.contains('pending')) badgeColor = Colors.orange;
-    if (status.contains('inactive')) badgeColor = Colors.red;
+  Color _getAvatarColor(String name) {
+    final int hash = name.hashCode;
+    final List<Color> avatarColors = [
+      Colors.blue.shade400,
+      Colors.indigo.shade400,
+      Colors.teal.shade400,
+      Colors.pink.shade400,
+      Colors.orange.shade400,
+      Colors.purple.shade400,
+      Colors.cyan.shade400,
+    ];
+    return avatarColors[hash.abs() % avatarColors.length];
+  }
 
+  Widget _buildRecentDriversList() {
+    return StreamBuilder<QuerySnapshot>(
+      stream: FirebaseFirestore.instance
+          .collection('drivers')
+          .orderBy('createdAt', descending: true)
+          .limit(5)
+          .snapshots(),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) return const SizedBox.shrink();
+        if (snapshot.data!.docs.isEmpty) return _buildEmptyState("No drivers found.");
+
+        return Container(
+          color: Colors.white,
+          child: Column(
+            children: snapshot.data!.docs.map((doc) {
+              final data = doc.data() as Map<String, dynamic>;
+              final String fullName = data['fullName'] ?? 'Unnamed';
+              final String status = data['status'] ?? 'pending_verification';
+              
+              final String initial = fullName.isNotEmpty ? fullName[0].toUpperCase() : '?';
+
+              return Column(
+                children: [
+                  ListTile(
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+                    leading: CircleAvatar(
+                      radius: 25,
+                      backgroundColor: _getAvatarColor(fullName),
+                      child: Text(
+                        initial,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 20,
+                        ),
+                      ),
+                    ),
+                    title: Text(fullName, style: const TextStyle(fontWeight: FontWeight.bold)),
+                    subtitle: Text("${data['vehicleType']} • ${data['licenseNumber']}"),
+                    trailing: _buildSmallStatusBadge(status),
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (c) => DriverDetail(driverId: doc.id, driverData: data)),
+                    ),
+                  ),
+                  const Divider(height: 1, indent: 80, endIndent: 20, color: Color(0xFFEEEEEE)),
+                ],
+              );
+            }).toList(),
+          ),
+        );
+      },
+    );
+  }
+
+
+  Widget _buildSectionTitle(String title) => Text(title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold));
+
+  Widget _buildListHeader(String title, VoidCallback onTap) => Padding(
+    padding: const EdgeInsets.fromLTRB(20, 10, 10, 10),
+    child: Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        _buildSectionTitle(title),
+        TextButton(onPressed: onTap, child: const Text("View All")),
+      ],
+    ),
+  );
+
+  PreferredSizeWidget _buildAppBar(BuildContext context, Color primaryColor) => AppBar(
+    title: const Text("Swiftline Admin", style: TextStyle(fontWeight: FontWeight.bold)),
+    backgroundColor: Colors.white,
+    elevation: 0.5,
+    actions: [
+      IconButton(onPressed: () => _handleLogout(context), icon: const Icon(Icons.logout, color: Colors.red)),
+    ],
+  );
+
+  Widget _buildWelcomeSection() => Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Text("Hello, ${_user?.email?.split('@')[0]} 👋", style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+      const Text("Fleet operations directory"),
+    ],
+  );
+
+  Widget _buildStatsGrid(Color color) => Row(
+    children: [
+      _buildStatCard("Drivers", totalDrivers.toString(), Icons.person, Colors.blue),
+      const SizedBox(width: 12),
+      _buildStatCard("Stations", totalStations.toString(), Icons.hub, Colors.orange),
+      const SizedBox(width: 12),
+      _buildStatCard("Active", activeShipments.toString(), Icons.local_shipping, Colors.green),
+    ],
+  );
+
+  Widget _buildStatCard(String t, String v, IconData i, Color c) => Expanded(
+    child: Container(
+      padding: const EdgeInsets.all(15),
+      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(15), border: Border.all(color: Colors.grey.shade100)),
+      child: Column(children: [Icon(i, color: c, size: 22), const SizedBox(height: 8), Text(v, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)), Text(t, style: const TextStyle(fontSize: 11, color: Colors.grey))]),
+    ),
+  );
+
+  Widget _buildAdminActions(BuildContext context, Color color) => GridView.count(
+    shrinkWrap: true, physics: const NeverScrollableScrollPhysics(), crossAxisCount: 2, crossAxisSpacing: 15, mainAxisSpacing: 15, childAspectRatio: 1.6,
+    children: [
+      _buildActionTile(context, "Add Station", Icons.add_business, color, () => Navigator.push(context, MaterialPageRoute(builder: (c) => const AddStation()))),
+      _buildActionTile(context, "Add Driver", Icons.person_add, Colors.indigo, () => Navigator.push(context, MaterialPageRoute(builder: (c) => const AddDriver()))),
+      _buildActionTile(context, "All Users", Icons.group, Colors.teal, () {}),
+      _buildActionTile(context, "Reports", Icons.analytics, Colors.purple, () {}),
+    ],
+  );
+
+  Widget _buildActionTile(BuildContext context, String t, IconData i, Color c, VoidCallback o) => InkWell(
+    onTap: o, child: Container(decoration: BoxDecoration(borderRadius: BorderRadius.circular(15), border: Border.all(color: c.withOpacity(0.3))),
+    child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [Icon(i, color: c), const SizedBox(height: 5), Text(t, style: TextStyle(color: c, fontWeight: FontWeight.bold, fontSize: 13))])),
+  );
+
+  Widget _buildSmallStatusBadge(String status) {
+    Color color = status == 'active' ? Colors.green : (status == 'rejected' ? Colors.red : Colors.orange);
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-      decoration: BoxDecoration(
-        color: badgeColor.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(10),
-      ),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+      decoration: BoxDecoration(color: color.withOpacity(0.1), borderRadius: BorderRadius.circular(6)),
       child: Text(
-        status.replaceAll('_', ' ').toUpperCase(),
-        style: TextStyle(color: badgeColor, fontSize: 9, fontWeight: FontWeight.bold),
+        status.split('_')[0].toUpperCase(),
+        style: TextStyle(color: color, fontSize: 9, fontWeight: FontWeight.bold),
       ),
     );
   }
 
-  Widget _buildEmptyState(String msg) {
-    return Container(
-      width: double.infinity,
-      height: 100,
-      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(15)),
-      child: Center(child: Text(msg, style: const TextStyle(color: Colors.grey))),
-    );
-  }
+  Widget _buildEmptyState(String msg) => Center(child: Padding(padding: const EdgeInsets.all(20), child: Text(msg, style: const TextStyle(color: Colors.grey))));
 
   Future<void> _handleLogout(BuildContext context) async {
     await FirebaseAuth.instance.signOut();
-    if (context.mounted) {
-      Navigator.pushAndRemoveUntil(context, MaterialPageRoute(builder: (c) => const LoginScreen()), (r) => false);
-    }
+    if (context.mounted) Navigator.pushAndRemoveUntil(context, MaterialPageRoute(builder: (c) => const LoginScreen()), (r) => false);
   }
 }

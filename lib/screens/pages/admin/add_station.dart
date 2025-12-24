@@ -14,6 +14,7 @@ class _AddStationState extends State<AddStation> {
   bool _isSaving = false;
   bool _isFetchingLocation = false;
 
+  // Controllers
   final _nameController = TextEditingController();
   final _codeController = TextEditingController();
   final _addressController = TextEditingController();
@@ -35,65 +36,6 @@ class _AddStationState extends State<AddStation> {
     _managerController.dispose();
     _phoneController.dispose();
     super.dispose();
-  }
-
-  Future<void> _saveStation() async {
-    if (!_formKey.currentState!.validate()) return;
-
-    setState(() => _isSaving = true);
-
-    try {
-      Map<String, dynamic> stationData = {
-        'stationName': _nameController.text.trim(),
-        'stationCode': _codeController.text.trim().toUpperCase(),
-        'stationType': _selectedType,
-        'address': _addressController.text.trim(),
-        'coordinates': GeoPoint(
-          double.parse(_latController.text),
-          double.parse(_longController.text),
-        ),
-        'managerName': _managerController.text.trim(),
-        'contactPhone': _phoneController.text.trim(),
-        'status': 'active',
-        'createdAt': FieldValue.serverTimestamp(),
-      };
-
-      await FirebaseFirestore.instance.collection('stations').add(stationData);
-
-      if (mounted) {
-        _showSuccessDialog();
-      }
-    } catch (e) {
-      _showSnackBar("Submission failed: $e", Colors.red);
-    } finally {
-      if (mounted) setState(() => _isSaving = false);
-    }
-  }
-
-  void _showSuccessDialog() {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Icon(Icons.check_circle, color: Colors.green, size: 60),
-        content: const Text(
-          "Station registered successfully in the system.",
-          textAlign: TextAlign.center,
-        ),
-        actions: [
-          Center(
-            child: TextButton(
-              onPressed: () {
-                Navigator.pop(context);
-                Navigator.pop(context);
-              },
-              child: const Text("Done", style: TextStyle(fontWeight: FontWeight.bold)),
-            ),
-          )
-        ],
-      ),
-    );
   }
 
   Future<void> _getCurrentLocation() async {
@@ -118,6 +60,11 @@ class _AddStationState extends State<AddStation> {
         }
       }
 
+      if (permission == LocationPermission.deniedForever) {
+        _showSnackBar("Location permissions are permanently denied. Please enable them in settings.", Colors.red);
+        return;
+      }
+
       Position position = await Geolocator.getCurrentPosition(
         desiredAccuracy: LocationAccuracy.high
       );
@@ -126,16 +73,62 @@ class _AddStationState extends State<AddStation> {
         _latController.text = position.latitude.toString();
         _longController.text = position.longitude.toString();
       });
+      _showSnackBar("Location coordinates fetched!", Colors.green);
     } catch (e) {
       _showSnackBar("Error: $e", Colors.red);
     } finally {
-      setState(() => _isFetchingLocation = false);
+      if (mounted) setState(() => _isFetchingLocation = false);
+    }
+  }
+
+  Future<void> _saveStation() async {
+    if (!_formKey.currentState!.validate()) return;
+
+    if (_latController.text.isEmpty || _longController.text.isEmpty) {
+      _showSnackBar("Please provide GPS coordinates for the station.", Colors.orange);
+      return;
+    }
+
+    setState(() => _isSaving = true);
+
+    try {
+      Map<String, dynamic> stationData = {
+        'stationName': _nameController.text.trim(),
+        'stationCode': _codeController.text.trim().toUpperCase(),
+        'stationType': _selectedType,
+        'address': _addressController.text.trim(),
+        'coordinates': GeoPoint(
+          double.parse(_latController.text),
+          double.parse(_longController.text),
+        ),
+        'managerName': _managerController.text.trim(),
+        'contactPhone': _phoneController.text.trim(),
+        'status': 'active',
+        'createdAt': FieldValue.serverTimestamp(),
+      };
+
+      await FirebaseFirestore.instance.collection('stations').add(stationData);
+
+      if (mounted) {
+        _showSnackBar("Station registered successfully!", Colors.green);
+        Navigator.pop(context);
+      }
+    } catch (e) {
+      _showSnackBar("Submission failed: $e", Colors.red);
+    } finally {
+      if (mounted) setState(() => _isSaving = false);
     }
   }
 
   void _showSnackBar(String message, Color color) {
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message), backgroundColor: color, behavior: SnackBarBehavior.floating),
+      SnackBar(
+        content: Text(message), 
+        backgroundColor: color, 
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        margin: const EdgeInsets.all(10),
+      ),
     );
   }
 
@@ -221,7 +214,6 @@ class _AddStationState extends State<AddStation> {
     );
   }
 
-  // --- UI COMPONENT METHODS ---
   Widget _buildSectionHeader(String title, IconData icon, Color color) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 20, top: 10),

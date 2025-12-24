@@ -2,9 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:carrier/screens/login_screen.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-// import 'package:intl/intl.dart';
 
-// Import your station screen
+// Import your screens
 import 'package:carrier/screens/pages/admin/add_station.dart';
 import 'package:carrier/screens/pages/admin/add_driver.dart';
 
@@ -21,7 +20,6 @@ class _AdminDashboardState extends State<AdminDashboard> {
   int totalDrivers = 0;
   int totalStations = 0;
   int activeShipments = 0;
-  // bool _isLoading = true;
 
   @override
   void initState() {
@@ -45,7 +43,6 @@ class _AdminDashboardState extends State<AdminDashboard> {
           totalDrivers = drivers.count ?? 0;
           totalStations = stations.count ?? 0;
           activeShipments = shipments.count ?? 0;
-          // _isLoading = false;
         });
       }
     } catch (e) {
@@ -53,9 +50,9 @@ class _AdminDashboardState extends State<AdminDashboard> {
     }
   }
 
-  Stream<List<Map<String, dynamic>>> _getRecentStations() {
+  Stream<List<Map<String, dynamic>>> _getRecentData(String collection) {
     return FirebaseFirestore.instance
-        .collection('stations')
+        .collection(collection)
         .orderBy('createdAt', descending: true)
         .limit(5)
         .snapshots()
@@ -87,7 +84,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
               
               const SizedBox(height: 30),
               
-              // 2. Administrative Actions
+              // 2. Management Actions
               _buildSectionTitle("Management Actions"),
               const SizedBox(height: 15),
               _buildAdminActions(context, primaryColor),
@@ -95,27 +92,22 @@ class _AdminDashboardState extends State<AdminDashboard> {
               const SizedBox(height: 30),
 
               // 3. Recent Stations Section
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  _buildSectionTitle("Recent Stations"),
-                  TextButton(
-                    onPressed: () {
-                      // TODO: Navigator.push(context, MaterialPageRoute(builder: (c) => const AllStationsScreen()));
-                    }, 
-                    child: const Text("View All")
-                  ),
-                ],
-              ),
+              _buildListHeader("Recent Stations", () {
+                // TODO: Navigator.push(context, MaterialPageRoute(builder: (c) => const AllStationsScreen()));
+              }),
               const SizedBox(height: 10),
               _buildStationHorizontalList(),
               
               const SizedBox(height: 30),
-              
-              // 4. System Logs
-              _buildSectionTitle("System Logs"),
-              const SizedBox(height: 15),
-              _buildSystemLogs(),
+
+              // 4. Recent Drivers Section (New)
+              _buildListHeader("Recent Drivers", () {
+                // TODO: Navigator.push(context, MaterialPageRoute(builder: (c) => const AllDriversScreen()));
+              }),
+              const SizedBox(height: 10),
+              _buildDriverHorizontalList(),
+
+              const SizedBox(height: 30),
             ],
           ),
         ),
@@ -123,12 +115,22 @@ class _AdminDashboardState extends State<AdminDashboard> {
     );
   }
 
-  // --- UI COMPONENTS ---
+  // --- SHARED UI COMPONENTS ---
 
   Widget _buildSectionTitle(String title) {
     return Text(
       title,
       style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, letterSpacing: 0.5),
+    );
+  }
+
+  Widget _buildListHeader(String title, VoidCallback onViewAll) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        _buildSectionTitle(title),
+        TextButton(onPressed: onViewAll, child: const Text("View All")),
+      ],
     );
   }
 
@@ -151,7 +153,6 @@ class _AdminDashboardState extends State<AdminDashboard> {
           ),
           onPressed: () {},
         ),
-        IconButton(onPressed: () {}, icon: Icon(Icons.search, color: Colors.grey[800])),
         IconButton(
           onPressed: () => _handleLogout(context), 
           icon: const Icon(Icons.logout, color: Colors.red)
@@ -168,7 +169,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
           "Hello, ${_user?.email?.split('@')[0]} 👋",
           style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
         ),
-        const Text("Monitoring fleet operations and station health."),
+        const Text("Monitoring fleet operations and system health."),
       ],
     );
   }
@@ -231,37 +232,26 @@ class _AdminDashboardState extends State<AdminDashboard> {
       borderRadius: BorderRadius.circular(20),
       child: Container(
         decoration: BoxDecoration(
-          color: Colors.white, // Keep background white for a clean look
+          color: Colors.white,
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-            color: color.withOpacity(0.5), // The colored border
-            width: 1.5,
-          ),
+          border: Border.all(color: color.withOpacity(0.5), width: 1.5),
         ),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            // Icon now uses the specific color
             Icon(icon, color: color, size: 28),
             const SizedBox(height: 8),
-            // Text now uses the specific color
-            Text(
-              title, 
-              style: TextStyle(
-                color: color, 
-                fontWeight: FontWeight.bold, 
-                fontSize: 14,
-              ),
-            ),
+            Text(title, style: TextStyle(color: color, fontWeight: FontWeight.bold, fontSize: 14)),
           ],
         ),
       ),
     );
   }
 
+  // --- RECENT STATIONS LIST ---
   Widget _buildStationHorizontalList() {
     return StreamBuilder<List<Map<String, dynamic>>>(
-      stream: _getRecentStations(),
+      stream: _getRecentData('stations'),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const SizedBox(height: 150, child: Center(child: CircularProgressIndicator()));
@@ -275,19 +265,42 @@ class _AdminDashboardState extends State<AdminDashboard> {
           child: ListView.builder(
             scrollDirection: Axis.horizontal,
             itemCount: snapshot.data!.length,
-            itemBuilder: (context, index) {
-              final station = snapshot.data![index];
-              return _buildStationCard(station);
-            },
+            itemBuilder: (context, index) => _buildDataCard(snapshot.data![index], isStation: true),
           ),
         );
       },
     );
   }
 
-  Widget _buildStationCard(Map<String, dynamic> station) {
-    final status = station['status'] ?? 'active';
+  // --- RECENT DRIVERS LIST (NEW) ---
+  Widget _buildDriverHorizontalList() {
+    return StreamBuilder<List<Map<String, dynamic>>>(
+      stream: _getRecentData('drivers'),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const SizedBox(height: 150, child: Center(child: CircularProgressIndicator()));
+        }
+        if (!snapshot.hasData || snapshot.data!.isEmpty) {
+          return _buildEmptyState("No drivers registered.");
+        }
+
+        return SizedBox(
+          height: 160,
+          child: ListView.builder(
+            scrollDirection: Axis.horizontal,
+            itemCount: snapshot.data!.length,
+            itemBuilder: (context, index) => _buildDataCard(snapshot.data![index], isStation: false),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildDataCard(Map<String, dynamic> data, {required bool isStation}) {
+    final status = data['status'] ?? 'active';
     final bool isActive = status.toString().toLowerCase() == 'active';
+    final String title = isStation ? (data['stationName'] ?? 'Unnamed') : (data['fullName'] ?? 'Unnamed');
+    final String subtitle = isStation ? "CODE: ${data['stationCode']}" : "${data['vehicleType'] ?? 'No Vehicle'}";
 
     return Container(
       width: 220,
@@ -306,38 +319,38 @@ class _AdminDashboardState extends State<AdminDashboard> {
             children: [
               Container(
                 padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(color: const Color(0xFFFF6E00).withOpacity(0.1), shape: BoxShape.circle),
-                child: const Icon(Icons.hub_outlined, size: 20, color: Color(0xFFFF6E00)),
+                decoration: BoxDecoration(
+                  color: (isStation ? Colors.orange : Colors.indigo).withOpacity(0.1), 
+                  shape: BoxShape.circle
+                ),
+                child: Icon(isStation ? Icons.hub_outlined : Icons.person_outline, size: 20, color: isStation ? Colors.orange : Colors.indigo),
               ),
               _buildStatusBadge(status, isActive),
             ],
           ),
           const Spacer(),
-          Text(
-            station['stationName'] ?? 'Unknown Station',
-            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-            maxLines: 1, overflow: TextOverflow.ellipsis,
-          ),
+          Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16), maxLines: 1, overflow: TextOverflow.ellipsis),
           const SizedBox(height: 4),
-          Text(
-            "CODE: ${station['stationCode'] ?? 'N/A'}",
-            style: TextStyle(color: Colors.grey[500], fontSize: 12, fontWeight: FontWeight.w600),
-          ),
+          Text(subtitle, style: TextStyle(color: Colors.grey[500], fontSize: 12, fontWeight: FontWeight.w600)),
         ],
       ),
     );
   }
 
   Widget _buildStatusBadge(String status, bool isActive) {
+    Color badgeColor = isActive ? Colors.green : Colors.orange;
+    if (status.contains('pending')) badgeColor = Colors.orange;
+    if (status.contains('inactive')) badgeColor = Colors.red;
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
       decoration: BoxDecoration(
-        color: isActive ? Colors.green.withOpacity(0.1) : Colors.red.withOpacity(0.1),
+        color: badgeColor.withOpacity(0.1),
         borderRadius: BorderRadius.circular(10),
       ),
       child: Text(
-        status.toUpperCase(),
-        style: TextStyle(color: isActive ? Colors.green : Colors.red, fontSize: 10, fontWeight: FontWeight.bold),
+        status.replaceAll('_', ' ').toUpperCase(),
+        style: TextStyle(color: badgeColor, fontSize: 9, fontWeight: FontWeight.bold),
       ),
     );
   }
@@ -348,30 +361,6 @@ class _AdminDashboardState extends State<AdminDashboard> {
       height: 100,
       decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(15)),
       child: Center(child: Text(msg, style: const TextStyle(color: Colors.grey))),
-    );
-  }
-
-  Widget _buildSystemLogs() {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(15),
-      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20)),
-      child: Column(
-        children: List.generate(3, (index) {
-          final logs = ["New driver registered", "Nairobi hub active", "System backup OK"];
-          return Padding(
-            padding: const EdgeInsets.symmetric(vertical: 8.0),
-            child: Row(
-              children: [
-                const Icon(Icons.circle, size: 6, color: Colors.blue),
-                const SizedBox(width: 12),
-                Expanded(child: Text(logs[index], style: const TextStyle(fontSize: 13))),
-                Text("2m ago", style: TextStyle(color: Colors.grey[400], fontSize: 11)),
-              ],
-            ),
-          );
-        }),
-      ),
     );
   }
 

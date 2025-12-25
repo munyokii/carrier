@@ -10,6 +10,8 @@ import 'package:carrier/screens/pages/admin/add_station.dart';
 import 'package:carrier/screens/pages/admin/add_driver.dart';
 import 'package:carrier/screens/pages/admin/all_drivers.dart';
 import 'package:carrier/screens/pages/admin/driver_detail.dart';
+import 'package:carrier/screens/pages/admin/all_stations.dart';
+import 'package:carrier/screens/pages/admin/station_detail.dart';
 
 class AdminDashboard extends StatefulWidget {
   const AdminDashboard({super.key});
@@ -30,7 +32,6 @@ class _AdminDashboardState extends State<AdminDashboard> {
     _fetchSystemStats();
   }
 
-  // --- DATA FETCHING ---
   Future<void> _fetchSystemStats() async {
     try {
       final drivers = await FirebaseFirestore.instance.collection('drivers').count().get();
@@ -83,16 +84,14 @@ class _AdminDashboardState extends State<AdminDashboard> {
                 ),
               ),
 
-              // --- 1. STATIONS SECTION (MAP CARDS GRID) ---
-              _buildListHeader("Recent Stations", () {
-                // TODO: Navigator.push(context, MaterialPageRoute(builder: (c) => const AllStations()));
+              _buildListHeader("Stations", () {
+                Navigator.push(context, MaterialPageRoute(builder: (c) => const AllStations()));
               }),
               _buildStationCardsRow(),
               
               const SizedBox(height: 25),
 
-              // --- 2. DRIVERS SECTION (WHATSAPP STYLE LIST) ---
-              _buildListHeader("Recent Drivers", () {
+              _buildListHeader("Drivers", () {
                 Navigator.push(context, MaterialPageRoute(builder: (c) => const AllDrivers()));
               }),
               _buildRecentDriversList(),
@@ -105,7 +104,6 @@ class _AdminDashboardState extends State<AdminDashboard> {
     );
   }
 
-  // --- STATION MAP CARDS (GRID STYLE) ---
   Widget _buildStationCardsRow() {
     return StreamBuilder<QuerySnapshot>(
       stream: FirebaseFirestore.instance
@@ -124,7 +122,11 @@ class _AdminDashboardState extends State<AdminDashboard> {
             padding: const EdgeInsets.symmetric(horizontal: 20),
             itemCount: snapshot.data!.docs.length,
             itemBuilder: (context, index) {
-              final data = snapshot.data!.docs[index].data() as Map<String, dynamic>;
+              final doc = snapshot.data!.docs[index];
+              final data = doc.data() as Map<String, dynamic>;
+              
+              data['id'] = doc.id; 
+
               return _buildStationMapCard(data);
             },
           ),
@@ -134,6 +136,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
   }
 
   Widget _buildStationMapCard(Map<String, dynamic> data) {
+    final String stationId = data['id'] ?? '';
     final geoPoint = data['coordinates'] as GeoPoint?;
     final LatLng location = geoPoint != null 
         ? LatLng(geoPoint.latitude, geoPoint.longitude) 
@@ -147,58 +150,76 @@ class _AdminDashboardState extends State<AdminDashboard> {
         borderRadius: BorderRadius.circular(20),
         boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 8, offset: const Offset(0, 4))],
       ),
-      child: Column(
-        children: [
-          ClipRRect(
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-            child: SizedBox(
-              height: 100,
-              child: FlutterMap(
-                options: MapOptions(
-                  initialCenter: location,
-                  initialZoom: 13.0,
-                  interactionOptions: const InteractionOptions(flags: InteractiveFlag.none),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(20),
+          onTap: () {
+            if (stationId.isNotEmpty) {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => StationDetail(stationId: stationId, stationData: data),
                 ),
-                children: [
-                  TileLayer(
-                    urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                    userAgentPackageName: 'com.swiftline.carrier',
-                  ),
-                  MarkerLayer(
-                    markers: [
-                      Marker(
-                        point: location,
-                        width: 30, height: 30,
-                        child: const Icon(Icons.location_on, color: Colors.red, size: 25),
+              );
+            }
+          },
+          child: Column(
+            children: [
+              ClipRRect(
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+                child: SizedBox(
+                  height: 100,
+                  child: AbsorbPointer(
+                    child: FlutterMap(
+                      options: MapOptions(
+                        initialCenter: location,
+                        initialZoom: 13.0,
+                        interactionOptions: const InteractionOptions(flags: InteractiveFlag.none),
                       ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.all(12),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Expanded(
-                      child: Text(data['stationName'] ?? 'Unnamed Hub', 
-                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-                        maxLines: 1, overflow: TextOverflow.ellipsis),
+                      children: [
+                        TileLayer(
+                          urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                          userAgentPackageName: 'com.swiftline.carrier',
+                        ),
+                        MarkerLayer(
+                          markers: [
+                            Marker(
+                              point: location,
+                              width: 30, height: 30,
+                              child: const Icon(Icons.location_on, color: Colors.red, size: 25),
+                            ),
+                          ],
+                        ),
+                      ],
                     ),
-                    _buildSmallStatusBadge(data['status'] ?? 'active'),
+                  ),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.all(12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Expanded(
+                          child: Text(data['stationName'] ?? 'Unnamed Hub', 
+                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                            maxLines: 1, overflow: TextOverflow.ellipsis),
+                        ),
+                        _buildSmallStatusBadge(data['status'] ?? 'active'),
+                      ],
+                    ),
+                    Text("Code: ${data['stationCode'] ?? 'N/A'}", 
+                      style: TextStyle(color: Colors.grey[500], fontSize: 11)),
                   ],
                 ),
-                Text("Code: ${data['stationCode'] ?? 'N/A'}", 
-                  style: TextStyle(color: Colors.grey[500], fontSize: 11)),
-              ],
-            ),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
@@ -206,12 +227,8 @@ class _AdminDashboardState extends State<AdminDashboard> {
   Color _getAvatarColor(String name) {
     final int hash = name.hashCode;
     final List<Color> avatarColors = [
-      Colors.blue.shade400,
-      Colors.indigo.shade400,
-      Colors.teal.shade400,
-      Colors.pink.shade400,
-      Colors.orange.shade400,
-      Colors.purple.shade400,
+      Colors.blue.shade400, Colors.indigo.shade400, Colors.teal.shade400,
+      Colors.pink.shade400, Colors.orange.shade400, Colors.purple.shade400,
       Colors.cyan.shade400,
     ];
     return avatarColors[hash.abs() % avatarColors.length];
@@ -234,8 +251,6 @@ class _AdminDashboardState extends State<AdminDashboard> {
             children: snapshot.data!.docs.map((doc) {
               final data = doc.data() as Map<String, dynamic>;
               final String fullName = data['fullName'] ?? 'Unnamed';
-              final String status = data['status'] ?? 'pending_verification';
-              
               final String initial = fullName.isNotEmpty ? fullName[0].toUpperCase() : '?';
 
               return Column(
@@ -245,18 +260,11 @@ class _AdminDashboardState extends State<AdminDashboard> {
                     leading: CircleAvatar(
                       radius: 25,
                       backgroundColor: _getAvatarColor(fullName),
-                      child: Text(
-                        initial,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 20,
-                        ),
-                      ),
+                      child: Text(initial, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 20)),
                     ),
                     title: Text(fullName, style: const TextStyle(fontWeight: FontWeight.bold)),
                     subtitle: Text("${data['vehicleType']} • ${data['licenseNumber']}"),
-                    trailing: _buildSmallStatusBadge(status),
+                    trailing: _buildSmallStatusBadge(data['status'] ?? 'pending'),
                     onTap: () => Navigator.push(
                       context,
                       MaterialPageRoute(builder: (c) => DriverDetail(driverId: doc.id, driverData: data)),
@@ -271,7 +279,6 @@ class _AdminDashboardState extends State<AdminDashboard> {
       },
     );
   }
-
 
   Widget _buildSectionTitle(String title) => Text(title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold));
 
@@ -341,10 +348,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
       decoration: BoxDecoration(color: color.withOpacity(0.1), borderRadius: BorderRadius.circular(6)),
-      child: Text(
-        status.split('_')[0].toUpperCase(),
-        style: TextStyle(color: color, fontSize: 9, fontWeight: FontWeight.bold),
-      ),
+      child: Text(status.split('_')[0].toUpperCase(), style: TextStyle(color: color, fontSize: 9, fontWeight: FontWeight.bold)),
     );
   }
 

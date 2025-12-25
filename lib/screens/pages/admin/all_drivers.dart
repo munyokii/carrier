@@ -12,7 +12,6 @@ class AllDrivers extends StatefulWidget {
 class _AllDriversState extends State<AllDrivers> {
   String _searchQuery = "";
 
-  // Helper for deterministic avatar colors
   Color _getAvatarColor(String name) {
     final int hash = name.hashCode;
     final List<Color> avatarColors = [

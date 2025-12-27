@@ -5,11 +5,9 @@ import 'package:carrier/widgets/custom_textfield.dart';
 import 'package:carrier/widgets/social_login_button.dart';
 import 'package:carrier/widgets/constants.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-
-// Import your actual dashboard files here
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:carrier/screens/pages/customer_dashboard.dart';
-// import 'package:carrier/screens/pages/admin_dashboard.dart';
-// import 'package:carrier/screens/pages/driver_dashboard.dart';
+import 'package:carrier/screens/pages/driver_dashboard.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -44,43 +42,71 @@ class _LoginScreenState extends State<LoginScreen> {
     if (_selectedRole == UserRole.stationAdmin) {
       if (!email.endsWith('@swiftline.ke')) {
         _showError("Only authorized @swiftline.ke emails can login as Admin.");
-        return; 
+        return;
       }
     }
 
     setState(() => _isLoading = true);
 
     try {
-      await FirebaseAuth.instance.signInWithEmailAndPassword(
+      UserCredential userCredential = await FirebaseAuth.instance.signInWithEmailAndPassword(
         email: email,
         password: password,
       );
 
-      if (context.mounted) {
-        Widget destinationPage;
-        
-        switch (_selectedRole) {
-          case UserRole.customer:
-            destinationPage = const CustomerDashboard();
-            break;
-          case UserRole.stationAdmin:
-            destinationPage = const AdminDashboard();
-            break;
-          case UserRole.driver:
-            destinationPage = const Placeholder();
-            break;
+      final String uid = userCredential.user!.uid;
+
+      if (!mounted) return; 
+
+      Widget destinationPage;
+
+      if (_selectedRole == UserRole.driver) {
+        DocumentSnapshot driverDoc = await FirebaseFirestore.instance
+            .collection('drivers')
+            .doc(uid)
+            .get();
+
+        if (!mounted) return;
+
+        if (!driverDoc.exists) {
+          await FirebaseAuth.instance.signOut();
+          _showError("No driver profile found for this account.");
+          return;
         }
 
-        Navigator.pushAndRemoveUntil(
-          context,
-          MaterialPageRoute(builder: (context) => destinationPage),
-          (route) => false,
-        );
+        String status = driverDoc.get('status') ?? 'pending_verification';
+
+        if (status == 'pending_verification') {
+          await FirebaseAuth.instance.signOut();
+          _showError("Account Pending: Your documents are being reviewed.");
+          return;
+        } else if (status == 'rejected') {
+          await FirebaseAuth.instance.signOut();
+          _showError("Access Denied: Your application was rejected.");
+          return;
+        }
+
+        destinationPage = const DriverDashboard();
+      } 
+      else if (_selectedRole == UserRole.stationAdmin) {
+        destinationPage = const AdminDashboard();
+      } 
+      else {
+        destinationPage = const CustomerDashboard();
       }
+
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(builder: (context) => destinationPage),
+        (route) => false,
+      );
+
     } on FirebaseAuthException catch (e) {
-      _showError(_getFriendlyErrorMessage(e.code));
+      if (mounted) _showError(_getFriendlyErrorMessage(e.code));
+    } catch (e) {
+      if (mounted) _showError("An unexpected error occurred.");
     } finally {
-      if (context.mounted) setState(() => _isLoading = false);
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
@@ -96,7 +122,13 @@ class _LoginScreenState extends State<LoginScreen> {
 
   void _showError(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message), backgroundColor: Colors.red),
+      SnackBar(
+        content: Text(message), 
+        backgroundColor: Colors.red[800], 
+        behavior: SnackBarBehavior.floating,
+        margin: const EdgeInsets.all(20),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      ),
     );
   }
 
@@ -131,36 +163,21 @@ class _LoginScreenState extends State<LoginScreen> {
 
                   const SizedBox(height: 30),
 
-                  // ROLE TOGGLE SECTION
                   Center(
                     child: SegmentedButton<UserRole>(
                       segments: const [
-                        ButtonSegment(
-                          value: UserRole.customer,
-                          label: Text('Customer'),
-                          icon: Icon(Icons.person_outline),
-                        ),
-                        ButtonSegment(
-                          value: UserRole.stationAdmin,
-                          label: Text('Admin'),
-                          icon: Icon(Icons.admin_panel_settings_outlined),
-                        ),
-                        ButtonSegment(
-                          value: UserRole.driver,
-                          label: Text('Driver'),
-                          icon: Icon(Icons.local_shipping_outlined),
-                        ),
+                        ButtonSegment(value: UserRole.customer, label: Text('Customer'), icon: Icon(Icons.person_outline)),
+                        ButtonSegment(value: UserRole.stationAdmin, label: Text('Admin'), icon: Icon(Icons.admin_panel_settings_outlined)),
+                        ButtonSegment(value: UserRole.driver, label: Text('Driver'), icon: Icon(Icons.local_shipping_outlined)),
                       ],
                       selected: {_selectedRole},
                       onSelectionChanged: (Set<UserRole> newSelection) {
-                        setState(() {
-                          _selectedRole = newSelection.first;
-                        });
+                        setState(() => _selectedRole = newSelection.first);
                       },
                       style: SegmentedButton.styleFrom(
                         selectedBackgroundColor: primaryColor,
                         selectedForegroundColor: Colors.white,
-                        side: BorderSide(color: primaryColor.withOpacity(0.5)),
+                        side: BorderSide(color: primaryColor.withValues()),
                       ),
                     ),
                   ),
@@ -188,7 +205,6 @@ class _LoginScreenState extends State<LoginScreen> {
 
                   const SizedBox(height: 30),
 
-                  // LOGIN BUTTON
                   SizedBox(
                     width: double.infinity,
                     height: 55,

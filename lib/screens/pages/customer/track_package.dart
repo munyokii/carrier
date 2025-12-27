@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:carrier/models/booking_model.dart';
 import 'package:intl/intl.dart';
-import 'package:mobile_scanner/mobile_scanner.dart'; // New Import
+import 'package:mobile_scanner/mobile_scanner.dart';
 
 class TrackPackageScreen extends StatefulWidget {
   const TrackPackageScreen({super.key});
@@ -15,7 +15,6 @@ class _TrackPackageScreenState extends State<TrackPackageScreen> {
   final TextEditingController _idController = TextEditingController();
   String? _searchId;
 
-  // Function to open the QR Scanner Modal
   void _openScanner() {
     showModalBottomSheet(
       context: context,
@@ -32,15 +31,14 @@ class _TrackPackageScreenState extends State<TrackPackageScreen> {
                   final String code = barcodes.first.rawValue ?? "";
                   if (code.isNotEmpty) {
                     setState(() {
-                      _idController.text = code;
-                      _searchId = code;
+                      _idController.text = code.toUpperCase();
+                      _searchId = code.toUpperCase();
                     });
-                    Navigator.pop(context); // Close scanner on success
+                    Navigator.pop(context);
                   }
                 }
               },
             ),
-            // Scanner Overlay UI
             Center(
               child: Container(
                 width: 250,
@@ -114,13 +112,13 @@ class _TrackPackageScreenState extends State<TrackPackageScreen> {
               Expanded(
                 child: TextField(
                   controller: _idController,
+                  textCapitalization: TextCapitalization.characters,
                   decoration: InputDecoration(
-                    hintText: "e.g. ABC123XYZ",
+                    hintText: "e.g. SWFT-ABC123",
                     filled: true,
                     fillColor: Colors.grey[100],
                     border: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: BorderSide.none),
                     prefixIcon: const Icon(Icons.tag),
-                    // SCAN BUTTON INSIDE TEXTFIELD
                     suffixIcon: IconButton(
                       icon: const Icon(Icons.qr_code_scanner, color: Colors.blue),
                       onPressed: _openScanner,
@@ -132,7 +130,9 @@ class _TrackPackageScreenState extends State<TrackPackageScreen> {
               GestureDetector(
                 onTap: () {
                   if (_idController.text.isNotEmpty) {
-                    setState(() => _searchId = _idController.text.trim());
+                    setState(() {
+                      _searchId = _idController.text.trim().toUpperCase();
+                    });
                   }
                 },
                 child: Container(
@@ -151,15 +151,25 @@ class _TrackPackageScreenState extends State<TrackPackageScreen> {
     );
   }
 
-  Widget _buildTrackingTimeline(String id) {
-    return StreamBuilder<DocumentSnapshot>(
-      stream: FirebaseFirestore.instance.collection('bookings').doc(id).snapshots(),
+  Widget _buildTrackingTimeline(String trackingNum) {
+    return StreamBuilder<QuerySnapshot>(
+      stream: FirebaseFirestore.instance
+          .collection('bookings')
+          .where('trackingNumber', isEqualTo: trackingNum)
+          .limit(1)
+          .snapshots(),
       builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) return const Center(child: CircularProgressIndicator());
-        if (!snapshot.hasData || !snapshot.data!.exists) return _buildErrorState();
-
-        final booking = BookingModel.fromFirestore(snapshot.data!.data() as Map<String, dynamic>, snapshot.data!.id);
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
         
+        if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+          return _buildErrorState();
+        }
+
+        final doc = snapshot.data!.docs.first;
+        final booking = BookingModel.fromFirestore(doc.data() as Map<String, dynamic>, doc.id);
+
         return ListView(
           padding: const EdgeInsets.all(25),
           children: [
@@ -177,8 +187,6 @@ class _TrackPackageScreenState extends State<TrackPackageScreen> {
     );
   }
 
-  // ... _buildTimelineStep, _buildPackageSummary, _buildWaitingState, _buildErrorState remain exactly the same as your previous implementation
-  
   Widget _buildTimelineStep(String title, String desc, DateTime? time, bool isDone) {
     Color color = isDone ? Theme.of(context).primaryColor : Colors.grey[300]!;
     return Row(
@@ -212,20 +220,37 @@ class _TrackPackageScreenState extends State<TrackPackageScreen> {
   Widget _buildPackageSummary(BookingModel booking) {
     return Container(
       padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20), border: Border.all(color: Colors.grey[200]!)),
-      child: Row(
+      decoration: BoxDecoration(
+        color: Colors.white, 
+        borderRadius: BorderRadius.circular(20), 
+        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 10)],
+        border: Border.all(color: Colors.grey[100]!)
+      ),
+      child: Column(
         children: [
-          const Icon(Icons.inventory_2, size: 40, color: Colors.blueGrey),
-          const SizedBox(width: 15),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(booking.itemDescription, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                Text("Destination: ${booking.deliveryAddress}", maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12, color: Colors.grey)),
-              ],
-            ),
+          Row(
+            children: [
+              const Icon(Icons.inventory_2, size: 40, color: Colors.blueGrey),
+              const SizedBox(width: 15),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(booking.itemDescription, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                    Text("Tracking ID: ${booking.trackingNumber}", style: const TextStyle(fontSize: 12, color: Colors.grey, fontWeight: FontWeight.bold)),
+                  ],
+                ),
+              ),
+            ],
           ),
+          const Divider(height: 30),
+          Row(
+            children: [
+              const Icon(Icons.location_on, size: 14, color: Colors.redAccent),
+              const SizedBox(width: 5),
+              Expanded(child: Text(booking.deliveryAddress, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12))),
+            ],
+          )
         ],
       ),
     );

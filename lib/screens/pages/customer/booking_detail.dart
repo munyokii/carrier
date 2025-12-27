@@ -176,7 +176,7 @@ class _BookingDetailsScreenState extends State<BookingDetailsScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(booking.statusDisplayName, style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: sColor)),
-              Text("ID: ${booking.id.substring(0, 8).toUpperCase()}", style: const TextStyle(color: Colors.grey, fontSize: 12)),
+              Text("ID: ${booking.trackingNumber}", style: const TextStyle(color: Colors.grey, fontSize: 12)),
             ],
           )
         ],

@@ -17,6 +17,8 @@ class CarrierModel {
   final String? email;
   final DateTime? lastUpdate;
 
+  double distance = 0.0;
+
   CarrierModel({
     required this.id,
     required this.driverName,

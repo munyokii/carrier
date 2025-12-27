@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:carrier/models/booking_model.dart';
 import 'package:intl/intl.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
+import 'package:firebase_auth/firebase_auth.dart'; // Required for security check
 
 class TrackPackageScreen extends StatefulWidget {
   const TrackPackageScreen({super.key});
@@ -13,6 +14,7 @@ class TrackPackageScreen extends StatefulWidget {
 
 class _TrackPackageScreenState extends State<TrackPackageScreen> {
   final TextEditingController _idController = TextEditingController();
+  final User? _currentUser = FirebaseAuth.instance.currentUser; // Current User
   String? _searchId;
 
   void _openScanner() {
@@ -77,7 +79,7 @@ class _TrackPackageScreenState extends State<TrackPackageScreen> {
     return Scaffold(
       backgroundColor: const Color(0xFFF8F9FD),
       appBar: AppBar(
-        title: const Text("Track Package", style: TextStyle(fontWeight: FontWeight.bold)),
+        title: const Text("Track My Package", style: TextStyle(fontWeight: FontWeight.bold)),
         backgroundColor: Colors.white,
         foregroundColor: Colors.black,
         elevation: 0,
@@ -105,7 +107,7 @@ class _TrackPackageScreenState extends State<TrackPackageScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text("Enter or Scan tracking number", style: TextStyle(color: Colors.grey, fontSize: 14)),
+          const Text("Enter or Scan your tracking number", style: TextStyle(color: Colors.grey, fontSize: 14)),
           const SizedBox(height: 12),
           Row(
             children: [
@@ -152,10 +154,12 @@ class _TrackPackageScreenState extends State<TrackPackageScreen> {
   }
 
   Widget _buildTrackingTimeline(String trackingNum) {
+    // SECURITY: Only fetch if the package belongs to the logged-in user
     return StreamBuilder<QuerySnapshot>(
       stream: FirebaseFirestore.instance
           .collection('bookings')
           .where('trackingNumber', isEqualTo: trackingNum)
+          .where('userId', isEqualTo: _currentUser?.uid) // SECURITY FILTER
           .limit(1)
           .snapshots(),
       builder: (context, snapshot) {
@@ -277,7 +281,9 @@ class _TrackPackageScreenState extends State<TrackPackageScreen> {
           const Icon(Icons.warning_amber_rounded, size: 60, color: Colors.redAccent),
           const SizedBox(height: 15),
           const Text("Tracking ID not found.", style: TextStyle(fontWeight: FontWeight.bold)),
-          const Text("Please check the ID and try again.", style: TextStyle(color: Colors.grey)),
+          const Text("You can only track packages linked to your account.", 
+            textAlign: TextAlign.center, 
+            style: TextStyle(color: Colors.grey, fontSize: 12)),
         ],
       ),
     );

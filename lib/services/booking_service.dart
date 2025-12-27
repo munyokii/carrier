@@ -1,9 +1,17 @@
+import 'dart:math';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:carrier/models/booking_model.dart';
 
 class BookingService {
   final CollectionReference _bookingsRef = 
       FirebaseFirestore.instance.collection('bookings');
+
+  String _generateTrackingNumber() {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; 
+    final random = Random();
+    String code = List.generate(6, (index) => chars[random.nextInt(chars.length)]).join();
+    return "SWFT-$code"; 
+  }
 
   Future<void> createBooking({
     required String userId,
@@ -20,11 +28,13 @@ class BookingService {
     double? weight,
   }) async {
     try {
-      String newId = _bookingsRef.doc().id;
+      final String newId = _bookingsRef.doc().id;
+      final String trackingNumber = _generateTrackingNumber();
 
       BookingModel newBooking = BookingModel(
         id: newId,
         userId: userId,
+        trackingNumber: trackingNumber,
         stationId: stationId,
         stationName: stationName,
         carrierId: '',
@@ -37,7 +47,7 @@ class BookingService {
         deliveryLocation: deliveryLocation,
         distance: distance,
         pickupDateTime: pickupDate,
-        weight: weight,
+        weight: weight ?? 0.0,
         status: 'pending',
         createdAt: DateTime.now(),
       );

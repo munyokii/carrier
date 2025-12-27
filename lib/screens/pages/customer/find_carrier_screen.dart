@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:math'; 
 import 'package:http/http.dart' as http;
 import 'package:uuid/uuid.dart';
 import 'package:flutter/material.dart';
@@ -281,7 +282,7 @@ class _BookingBottomSheet extends StatefulWidget {
 class _BookingBottomSheetState extends State<_BookingBottomSheet> {
   final _itemController = TextEditingController();
   final _addressController = TextEditingController();
-  final _weightController = TextEditingController(); // NEW Weight Controller
+  final _weightController = TextEditingController(); 
   
   List<dynamic> _placePredictions = [];
   final String _googleMapsApiKey = "YOUR_GOOGLE_PLACES_API_KEY"; 
@@ -289,6 +290,13 @@ class _BookingBottomSheetState extends State<_BookingBottomSheet> {
 
   String _selectedVehicle = 'Motorbike';
   bool _isSubmitting = false;
+
+  String _generateTrackingNumber() {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; 
+    final random = Random();
+    String code = List.generate(6, (index) => chars[random.nextInt(chars.length)]).join();
+    return "SWFT-$code"; 
+  }
 
   Future<void> _getPlacePredictions(String query) async {
     if (query.isEmpty) {
@@ -321,16 +329,19 @@ class _BookingBottomSheetState extends State<_BookingBottomSheet> {
     setState(() => _isSubmitting = true);
 
     try {
+      final String trackingId = _generateTrackingNumber();
+
       final booking = BookingModel(
-        id: '', 
+        id: '',
         userId: user.uid,
         stationId: widget.stationData['id'],
         stationName: widget.stationData['stationName'],
+        trackingNumber: trackingId,
         carrierId: '',
         carrierName: 'Searching...',
         vehicleType: _selectedVehicle,
         itemDescription: _itemController.text.trim(),
-        weight: double.tryParse(_weightController.text) ?? 0.0, // NEW field added to model call
+        weight: double.tryParse(_weightController.text) ?? 0.0,
         pickupAddress: widget.stationData['address'],
         pickupLocation: widget.stationData['coordinates'],
         deliveryAddress: _addressController.text.trim(),
@@ -341,17 +352,45 @@ class _BookingBottomSheetState extends State<_BookingBottomSheet> {
         createdAt: DateTime.now(),
       );
 
-      await FirebaseFirestore.instance.collection('bookings').add(booking.toMap());
+      var bookingData = booking.toMap();
+      bookingData['createdAt'] = FieldValue.serverTimestamp();
+
+      await FirebaseFirestore.instance.collection('bookings').add(bookingData);
 
       if (mounted) {
         Navigator.pop(context);
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Booking Sent!"), backgroundColor: Colors.green));
+        _showSuccessDialog(trackingId); 
       }
     } catch (e) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: $e"), backgroundColor: Colors.red));
     } finally {
       if (mounted) setState(() => _isSubmitting = false);
     }
+  }
+
+  void _showSuccessDialog(String code) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text("Booking Successful!"),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text("Your tracking number is:"),
+            const SizedBox(height: 15),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+              decoration: BoxDecoration(color: Colors.blue.withOpacity(0.1), borderRadius: BorderRadius.circular(10)),
+              child: Text(code, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, letterSpacing: 1, color: Colors.blue)),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text("OK"))
+        ],
+      ),
+    );
   }
 
   @override
@@ -371,7 +410,6 @@ class _BookingBottomSheetState extends State<_BookingBottomSheet> {
             _buildInput("Item Description", _itemController, Icons.inventory_2_outlined),
             const SizedBox(height: 15),
             
-            // WEIGHT FIELD
             TextField(
               controller: _weightController,
               keyboardType: const TextInputType.numberWithOptions(decimal: true),
@@ -386,7 +424,6 @@ class _BookingBottomSheetState extends State<_BookingBottomSheet> {
             ),
             const SizedBox(height: 15),
 
-            // DELIVERY DESTINATION
             TextField(
               controller: _addressController,
               onChanged: _getPlacePredictions,

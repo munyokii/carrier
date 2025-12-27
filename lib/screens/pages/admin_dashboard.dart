@@ -12,6 +12,7 @@ import 'package:carrier/screens/pages/admin/all_drivers.dart';
 import 'package:carrier/screens/pages/admin/driver_detail.dart';
 import 'package:carrier/screens/pages/admin/all_stations.dart';
 import 'package:carrier/screens/pages/admin/station_detail.dart';
+import 'package:carrier/screens/pages/admin/all_bookings.dart';
 
 class AdminDashboard extends StatefulWidget {
   const AdminDashboard({super.key});
@@ -333,7 +334,9 @@ class _AdminDashboardState extends State<AdminDashboard> {
     children: [
       _buildActionTile(context, "Add Station", Icons.add_business, color, () => Navigator.push(context, MaterialPageRoute(builder: (c) => const AddStation()))),
       _buildActionTile(context, "Add Driver", Icons.person_add, Colors.indigo, () => Navigator.push(context, MaterialPageRoute(builder: (c) => const AddDriver()))),
-      _buildActionTile(context, "All Users", Icons.group, Colors.teal, () {}),
+      _buildActionTile(context, "Bookings", Icons.inventory_2, Colors.teal, () {
+        Navigator.push(context, MaterialPageRoute(builder: (c) => const AllBookings()));
+      }),
       _buildActionTile(context, "Reports", Icons.analytics, Colors.purple, () {}),
     ],
   );

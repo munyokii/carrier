@@ -1,8 +1,9 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:cloudinary_public/cloudinary_public.dart'; // Use for Cloudinary
+import 'package:cloudinary_public/cloudinary_public.dart';
 
 class AddDriver extends StatefulWidget {
   const AddDriver({super.key});
@@ -14,10 +15,10 @@ class AddDriver extends StatefulWidget {
 class _AddDriverState extends State<AddDriver> {
   final _formKey = GlobalKey<FormState>();
   bool _isSaving = false;
+  bool _obscurePassword = true;
 
   final String _cloudName = const String.fromEnvironment('CLOUDINARY_NAME'); 
   final String _uploadPreset = const String.fromEnvironment('UPLOAD_PRESET');
-
   late CloudinaryPublic _cloudinary;
 
   File? _licenseImage;
@@ -26,6 +27,7 @@ class _AddDriverState extends State<AddDriver> {
 
   final _nameController = TextEditingController();
   final _emailController = TextEditingController();
+  final _passwordController = TextEditingController();
   final _phoneController = TextEditingController();
   final _licenseController = TextEditingController();
   final _experienceController = TextEditingController();
@@ -43,6 +45,7 @@ class _AddDriverState extends State<AddDriver> {
   void dispose() {
     _nameController.dispose();
     _emailController.dispose();
+    _passwordController.dispose();
     _phoneController.dispose();
     _licenseController.dispose();
     _experienceController.dispose();
@@ -93,14 +96,22 @@ class _AddDriverState extends State<AddDriver> {
     setState(() => _isSaving = true);
 
     try {
+      UserCredential userCredential = await FirebaseAuth.instance.createUserWithEmailAndPassword(
+        email: _emailController.text.trim(),
+        password: _passwordController.text.trim(),
+      );
+
+      final String uid = userCredential.user!.uid;
+
       final String? licenseUrl = await _uploadToCloudinary(_licenseImage!, 'licenses');
       final String? conductUrl = await _uploadToCloudinary(_conductImage!, 'conduct');
 
       if (licenseUrl == null || conductUrl == null) {
-        throw Exception("Image upload failed. Check your Cloudinary settings.");
+        throw Exception("Document upload failed. Try again.");
       }
 
-      await FirebaseFirestore.instance.collection('drivers').add({
+      await FirebaseFirestore.instance.collection('drivers').doc(uid).set({
+        'driverId': uid,
         'fullName': _nameController.text.trim(),
         'email': _emailController.text.trim(),
         'phone': _phoneController.text.trim(),
@@ -110,15 +121,18 @@ class _AddDriverState extends State<AddDriver> {
         'licenseImageUrl': licenseUrl,
         'conductImageUrl': conductUrl,
         'status': 'pending_verification',
+        'role': 'driver',
         'createdAt': FieldValue.serverTimestamp(),
       });
 
       if (mounted) {
-        _showSnackBar("Driver Profile Created!", Colors.green);
+        _showSnackBar("Driver Registered Successfully!", Colors.green);
         Navigator.pop(context);
       }
+    } on FirebaseAuthException catch (e) {
+      _showSnackBar(e.message ?? "Authentication failed", Colors.red);
     } catch (e) {
-      _showSnackBar("Error: ${e.toString()}", Colors.red);
+      _showSnackBar("An error occurred: $e", Colors.red);
     } finally {
       if (mounted) setState(() => _isSaving = false);
     }
@@ -150,15 +164,35 @@ class _AddDriverState extends State<AddDriver> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _buildSectionHeader("Personal Details", Icons.person_outline, primaryColor),
+              _buildSectionHeader("Account Credentials", Icons.lock_person_outlined, primaryColor),
               _buildField("Full Name", _nameController, Icons.badge_outlined),
               const SizedBox(height: 16),
               _buildField("Email Address", _emailController, Icons.alternate_email, isEmail: true),
               const SizedBox(height: 16),
-              _buildField("Phone Number", _phoneController, Icons.phone_android, isNumber: true),
               
+              TextFormField(
+                controller: _passwordController,
+                obscureText: _obscurePassword,
+                decoration: InputDecoration(
+                  hintText: "Password",
+                  prefixIcon: const Icon(Icons.password_outlined, size: 20),
+                  suffixIcon: IconButton(
+                    icon: Icon(_obscurePassword ? Icons.visibility_off : Icons.visibility),
+                    onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+                  ),
+                  filled: true,
+                  fillColor: Colors.grey[50],
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: BorderSide.none),
+                ),
+                validator: (v) => (v != null && v.length < 6) ? 'Min 6 characters required' : null,
+              ),
+
               const SizedBox(height: 32),
-              _buildSectionHeader("Professional Info", Icons.assignment_ind_outlined, Colors.indigo),
+              _buildSectionHeader("Contact Info", Icons.phone_android_outlined, Colors.indigo),
+              _buildField("Phone Number", _phoneController, Icons.phone_android, isNumber: true),
+
+              const SizedBox(height: 32),
+              _buildSectionHeader("Professional Info", Icons.assignment_ind_outlined, Colors.orange),
               _buildField("License Number", _licenseController, Icons.contact_emergency_outlined),
               const SizedBox(height: 16),
               Row(
@@ -198,7 +232,7 @@ class _AddDriverState extends State<AddDriver> {
                   ),
                   child: _isSaving 
                     ? const CircularProgressIndicator(color: Colors.white) 
-                    : const Text("Save Driver Profile", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                    : const Text("Register & Create Account", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                 ),
               ),
             ],
@@ -207,6 +241,7 @@ class _AddDriverState extends State<AddDriver> {
       ),
     );
   }
+
 
   Widget _buildSectionHeader(String title, IconData icon, Color color) {
     return Padding(
@@ -260,7 +295,7 @@ class _AddDriverState extends State<AddDriver> {
         width: double.infinity,
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          border: Border.all(color: isUploaded ? Colors.green.shade300 : Colors.grey.shade300, style: BorderStyle.solid),
+          border: Border.all(color: isUploaded ? Colors.green.shade300 : Colors.grey.shade300),
           borderRadius: BorderRadius.circular(15),
           color: isUploaded ? Colors.green.shade50 : Colors.grey.shade50,
         ),

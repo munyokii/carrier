@@ -15,9 +15,18 @@ class AddDriver extends StatefulWidget {
 class _AddDriverState extends State<AddDriver> {
   final _formKey = GlobalKey<FormState>();
   bool _isSaving = false;
-  bool _obscurePassword = true;
+  bool _obscurePassword = true; // Visibility Toggle State
 
-  final String _cloudName = const String.fromEnvironment('CLOUDINARY_NAME'); 
+  // Relation & Data State
+  String? _selectedStationId;
+  String? _selectedStationName;
+  List<Map<String, dynamic>> _stations = [];
+  
+  String _selectedVehicle = 'Van';
+  final List<String> _vehicles = ['Motorbike', 'Van', 'Truck (Light)', 'Truck (Heavy)'];
+
+  // Cloudinary Config
+  final String _cloudName = const String.fromEnvironment('CLOUDINARY_NAME');
   final String _uploadPreset = const String.fromEnvironment('UPLOAD_PRESET');
   late CloudinaryPublic _cloudinary;
 
@@ -25,6 +34,7 @@ class _AddDriverState extends State<AddDriver> {
   File? _conductImage;
   final ImagePicker _picker = ImagePicker();
 
+  // Controllers
   final _nameController = TextEditingController();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
@@ -32,13 +42,27 @@ class _AddDriverState extends State<AddDriver> {
   final _licenseController = TextEditingController();
   final _experienceController = TextEditingController();
 
-  String _selectedVehicle = 'Van';
-  final List<String> _vehicles = ['Motorbike', 'Van', 'Truck (Light)', 'Truck (Heavy)'];
-
   @override
   void initState() {
     super.initState();
     _cloudinary = CloudinaryPublic(_cloudName, _uploadPreset, cache: false);
+    _fetchStations();
+  }
+
+  Future<void> _fetchStations() async {
+    try {
+      final snapshot = await FirebaseFirestore.instance.collection('stations').get();
+      if (mounted) {
+        setState(() {
+          _stations = snapshot.docs.map((doc) => {
+            'id': doc.id,
+            'name': doc['stationName'],
+          }).toList();
+        });
+      }
+    } catch (e) {
+      debugPrint("Error fetching stations: $e");
+    }
   }
 
   @override
@@ -54,10 +78,9 @@ class _AddDriverState extends State<AddDriver> {
 
   Future<void> _pickImage(bool isLicense) async {
     final XFile? pickedFile = await _picker.pickImage(
-      source: ImageSource.gallery,
-      imageQuality: 50,
+      source: ImageSource.gallery, 
+      imageQuality: 50
     );
-
     if (pickedFile != null) {
       setState(() {
         if (isLicense) {
@@ -72,24 +95,22 @@ class _AddDriverState extends State<AddDriver> {
   Future<String?> _uploadToCloudinary(File file, String folder) async {
     try {
       CloudinaryResponse response = await _cloudinary.uploadFile(
-        CloudinaryFile.fromFile(
-          file.path,
-          folder: "drivers/$folder",
-          resourceType: CloudinaryResourceType.Image,
-        ),
+        CloudinaryFile.fromFile(file.path, folder: "drivers/$folder"),
       );
       return response.secureUrl;
     } catch (e) {
-      debugPrint("Cloudinary Upload Error: $e");
       return null;
     }
   }
 
   Future<void> _saveDriver() async {
     if (!_formKey.currentState!.validate()) return;
-    
     if (_licenseImage == null || _conductImage == null) {
-      _showSnackBar("Please upload both required documents", Colors.orange);
+      _showSnackBar("Please upload documents", Colors.orange);
+      return;
+    }
+    if (_selectedStationId == null) {
+      _showSnackBar("Please assign a station", Colors.orange);
       return;
     }
 
@@ -102,13 +123,8 @@ class _AddDriverState extends State<AddDriver> {
       );
 
       final String uid = userCredential.user!.uid;
-
       final String? licenseUrl = await _uploadToCloudinary(_licenseImage!, 'licenses');
       final String? conductUrl = await _uploadToCloudinary(_conductImage!, 'conduct');
-
-      if (licenseUrl == null || conductUrl == null) {
-        throw Exception("Document upload failed. Try again.");
-      }
 
       await FirebaseFirestore.instance.collection('drivers').doc(uid).set({
         'driverId': uid,
@@ -121,18 +137,15 @@ class _AddDriverState extends State<AddDriver> {
         'licenseImageUrl': licenseUrl,
         'conductImageUrl': conductUrl,
         'status': 'pending_verification',
+        'stationId': _selectedStationId,
+        'stationName': _selectedStationName,
         'role': 'driver',
         'createdAt': FieldValue.serverTimestamp(),
       });
 
-      if (mounted) {
-        _showSnackBar("Driver Registered Successfully!", Colors.green);
-        Navigator.pop(context);
-      }
-    } on FirebaseAuthException catch (e) {
-      _showSnackBar(e.message ?? "Authentication failed", Colors.red);
+      if (mounted) Navigator.pop(context);
     } catch (e) {
-      _showSnackBar("An error occurred: $e", Colors.red);
+      _showSnackBar("Error: $e", Colors.red);
     } finally {
       if (mounted) setState(() => _isSaving = false);
     }
@@ -140,23 +153,14 @@ class _AddDriverState extends State<AddDriver> {
 
   void _showSnackBar(String message, Color color) {
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message), backgroundColor: color, behavior: SnackBarBehavior.floating),
+      SnackBar(content: Text(message), backgroundColor: color, behavior: SnackBarBehavior.floating)
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    final primaryColor = Theme.of(context).colorScheme.primary;
-
     return Scaffold(
-      backgroundColor: Colors.white,
-      appBar: AppBar(
-        title: const Text("Register Driver", style: TextStyle(fontWeight: FontWeight.bold)),
-        centerTitle: true,
-        backgroundColor: Colors.white,
-        elevation: 0,
-        foregroundColor: Colors.black,
-      ),
+      appBar: AppBar(title: const Text("Register Driver", style: TextStyle(fontWeight: FontWeight.bold))),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(24),
         child: Form(
@@ -164,18 +168,20 @@ class _AddDriverState extends State<AddDriver> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _buildSectionHeader("Account Credentials", Icons.lock_person_outlined, primaryColor),
-              _buildField("Full Name", _nameController, Icons.badge_outlined),
+              const Text("PERSONAL DETAILS", style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey)),
+              const SizedBox(height: 12),
+              _buildField("Full Name", _nameController, Icons.person),
               const SizedBox(height: 16),
-              _buildField("Email Address", _emailController, Icons.alternate_email, isEmail: true),
+              _buildField("Email Address", _emailController, Icons.email),
               const SizedBox(height: 16),
               
+              // Password Field with Toggle
               TextFormField(
                 controller: _passwordController,
                 obscureText: _obscurePassword,
                 decoration: InputDecoration(
-                  hintText: "Password",
-                  prefixIcon: const Icon(Icons.password_outlined, size: 20),
+                  hintText: "Account Password",
+                  prefixIcon: const Icon(Icons.lock),
                   suffixIcon: IconButton(
                     icon: Icon(_obscurePassword ? Icons.visibility_off : Icons.visibility),
                     onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
@@ -184,57 +190,53 @@ class _AddDriverState extends State<AddDriver> {
                   fillColor: Colors.grey[50],
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: BorderSide.none),
                 ),
-                validator: (v) => (v != null && v.length < 6) ? 'Min 6 characters required' : null,
+                validator: (v) => (v != null && v.length < 6) ? 'Min 6 characters' : null,
               ),
 
               const SizedBox(height: 32),
-              _buildSectionHeader("Contact Info", Icons.phone_android_outlined, Colors.indigo),
-              _buildField("Phone Number", _phoneController, Icons.phone_android, isNumber: true),
-
-              const SizedBox(height: 32),
-              _buildSectionHeader("Professional Info", Icons.assignment_ind_outlined, Colors.orange),
-              _buildField("License Number", _licenseController, Icons.contact_emergency_outlined),
-              const SizedBox(height: 16),
+              const Text("LOGISTICS ASSIGNMENT", style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey)),
+              const SizedBox(height: 12),
+              
+              // Station & Vehicle Selection
               Row(
                 children: [
-                  Expanded(child: _buildField("Years Experience", _experienceController, Icons.history, isNumber: true)),
+                  Expanded(child: _buildStationDropdown()),
                   const SizedBox(width: 12),
-                  Expanded(child: _buildDropdown()),
+                  Expanded(child: _buildVehicleDropdown()),
                 ],
               ),
-
+              
               const SizedBox(height: 32),
-              _buildSectionHeader("Documents Verification", Icons.verified_user_outlined, Colors.teal),
-              _buildUploadPlaceholder(
+              const Text("DOCUMENTATION", style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey)),
+              const SizedBox(height: 12),
+              
+              _buildUploadTile(
                 label: "Driver's License (Front)",
                 isUploaded: _licenseImage != null,
                 onTap: () => _pickImage(true),
               ),
               const SizedBox(height: 12),
-              _buildUploadPlaceholder(
+              _buildUploadTile(
                 label: "Certificate of Good Conduct",
                 isUploaded: _conductImage != null,
                 onTap: () => _pickImage(false),
               ),
 
-              const SizedBox(height: 50),
-              
+              const SizedBox(height: 40),
               SizedBox(
                 width: double.infinity,
                 height: 55,
                 child: ElevatedButton(
                   onPressed: _isSaving ? null : _saveDriver,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: primaryColor,
-                    foregroundColor: Colors.white,
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
                     elevation: 0,
                   ),
                   child: _isSaving 
                     ? const CircularProgressIndicator(color: Colors.white) 
-                    : const Text("Register & Create Account", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                    : const Text("Complete Registration", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                 ),
-              ),
+              )
             ],
           ),
         ),
@@ -242,38 +244,43 @@ class _AddDriverState extends State<AddDriver> {
     );
   }
 
-
-  Widget _buildSectionHeader(String title, IconData icon, Color color) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 20),
-      child: Row(
-        children: [
-          Container(width: 4, height: 24, decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(10))),
-          const SizedBox(width: 12),
-          Icon(icon, color: color, size: 22),
-          const SizedBox(width: 8),
-          Text(title.toUpperCase(), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w900, letterSpacing: 1.1)),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildField(String hint, TextEditingController controller, IconData icon, {bool isNumber = false, bool isEmail = false}) {
+  // Helper Widgets
+  Widget _buildField(String hint, TextEditingController controller, IconData icon) {
     return TextFormField(
       controller: controller,
-      keyboardType: isNumber ? TextInputType.number : (isEmail ? TextInputType.emailAddress : TextInputType.text),
       decoration: InputDecoration(
-        hintText: hint,
-        prefixIcon: Icon(icon, size: 20),
-        filled: true,
-        fillColor: Colors.grey[50],
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: BorderSide.none),
+        hintText: hint, 
+        prefixIcon: Icon(icon), 
+        filled: true, 
+        fillColor: Colors.grey[50], 
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: BorderSide.none)
       ),
       validator: (v) => (v == null || v.isEmpty) ? 'Required' : null,
     );
   }
 
-  Widget _buildDropdown() {
+  Widget _buildStationDropdown() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      decoration: BoxDecoration(color: Colors.grey[50], borderRadius: BorderRadius.circular(15)),
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<String>(
+          value: _selectedStationId,
+          hint: const Text("Station"),
+          isExpanded: true,
+          items: _stations.map((s) => DropdownMenuItem(value: s['id'] as String, child: Text(s['name'], style: const TextStyle(fontSize: 13)))).toList(),
+          onChanged: (val) {
+            setState(() {
+              _selectedStationId = val;
+              _selectedStationName = _stations.firstWhere((s) => s['id'] == val)['name'];
+            });
+          },
+        ),
+      ),
+    );
+  }
+
+  Widget _buildVehicleDropdown() {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12),
       decoration: BoxDecoration(color: Colors.grey[50], borderRadius: BorderRadius.circular(15)),
@@ -288,31 +295,14 @@ class _AddDriverState extends State<AddDriver> {
     );
   }
 
-  Widget _buildUploadPlaceholder({required String label, required bool isUploaded, required VoidCallback onTap}) {
-    return GestureDetector(
+  Widget _buildUploadTile({required String label, required bool isUploaded, required VoidCallback onTap}) {
+    return ListTile(
       onTap: onTap,
-      child: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          border: Border.all(color: isUploaded ? Colors.green.shade300 : Colors.grey.shade300),
-          borderRadius: BorderRadius.circular(15),
-          color: isUploaded ? Colors.green.shade50 : Colors.grey.shade50,
-        ),
-        child: Row(
-          children: [
-            Icon(isUploaded ? Icons.check_circle_outline : Icons.cloud_upload_outlined, color: isUploaded ? Colors.green : Colors.grey),
-            const SizedBox(width: 15),
-            Expanded(
-              child: Text(
-                isUploaded ? "Document Selected" : label, 
-                style: TextStyle(color: isUploaded ? Colors.green.shade700 : Colors.grey, fontSize: 13)
-              ),
-            ),
-            Text(isUploaded ? "Change" : "Upload", style: TextStyle(color: isUploaded ? Colors.grey : Colors.blue, fontWeight: FontWeight.bold, fontSize: 13)),
-          ],
-        ),
-      ),
+      tileColor: isUploaded ? Colors.green[50] : Colors.grey[50],
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+      leading: Icon(isUploaded ? Icons.verified : Icons.cloud_upload_outlined, color: isUploaded ? Colors.green : Colors.blue),
+      title: Text(label, style: const TextStyle(fontSize: 13)),
+      trailing: Text(isUploaded ? "Change" : "Upload", style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.blue)),
     );
   }
 }

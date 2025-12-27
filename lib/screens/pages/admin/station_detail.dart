@@ -9,6 +9,88 @@ class StationDetail extends StatelessWidget {
 
   const StationDetail({super.key, required this.stationId, required this.stationData});
 
+  // --- NEW: LOGIC TO ASSIGN DRIVER ---
+  void _showAssignDriverSheet(BuildContext context) {
+    final primaryColor = Theme.of(context).colorScheme.primary;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(25))),
+      builder: (context) => DraggableScrollableSheet(
+        initialChildSize: 0.7,
+        maxChildSize: 0.9,
+        expand: false,
+        builder: (context, scrollController) => Column(
+          children: [
+            const SizedBox(height: 15),
+            Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(10))),
+            const Padding(
+              padding: EdgeInsets.all(20.0),
+              child: Text("Assign Driver to Hub", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            ),
+            Expanded(
+              child: StreamBuilder<QuerySnapshot>(
+                // Fetch drivers who are NOT currently at this station
+                stream: FirebaseFirestore.instance
+                    .collection('drivers')
+                    .where('status', isEqualTo: 'active')
+                    .snapshots(),
+                builder: (context, snapshot) {
+                  if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
+                  
+                  // Filter locally to find drivers available for transfer or newly active
+                  final availableDrivers = snapshot.data!.docs.where((doc) {
+                    final data = doc.data() as Map<String, dynamic>;
+                    return data['stationId'] != stationId;
+                  }).toList();
+
+                  if (availableDrivers.isEmpty) {
+                    return const Center(child: Text("No available drivers found."));
+                  }
+
+                  return ListView.builder(
+                    controller: scrollController,
+                    itemCount: availableDrivers.length,
+                    itemBuilder: (context, index) {
+                      final doc = availableDrivers[index];
+                      final driver = doc.data() as Map<String, dynamic>;
+                      
+                      return ListTile(
+                        leading: CircleAvatar(
+                          backgroundColor: primaryColor.withOpacity(0.1),
+                          child: Text(driver['fullName'][0]),
+                        ),
+                        title: Text(driver['fullName']),
+                        subtitle: Text("${driver['vehicleType']} • ${driver['experienceYears']}y Exp"),
+                        trailing: IconButton(
+                          icon: const Icon(Icons.add_circle_outline, color: Colors.green),
+                          onPressed: () async {
+                            await FirebaseFirestore.instance
+                                .collection('drivers')
+                                .doc(doc.id)
+                                .update({'stationId': stationId});
+                            
+                            if (context.mounted) {
+                              Navigator.pop(context);
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(content: Text("${driver['fullName']} assigned to ${stationData['stationName']}"))
+                              );
+                            }
+                          },
+                        ),
+                      );
+                    },
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final geoPoint = stationData['coordinates'] as GeoPoint?;
@@ -22,6 +104,15 @@ class StationDetail extends StatelessWidget {
         elevation: 0,
         backgroundColor: Colors.white,
         foregroundColor: Colors.black,
+        actions: [
+          // ADD DRIVER BUTTON IN APP BAR
+          TextButton.icon(
+            onPressed: () => _showAssignDriverSheet(context),
+            icon: const Icon(Icons.person_add_alt_1, size: 18),
+            label: const Text("Assign"),
+          ),
+          const SizedBox(width: 8),
+        ],
       ),
       body: SingleChildScrollView(
         child: Column(
@@ -41,8 +132,7 @@ class StationDetail extends StatelessWidget {
                     markers: [
                       Marker(
                         point: location,
-                        width: 40,
-                        height: 40,
+                        width: 40, height: 40,
                         child: const Icon(Icons.location_on, color: Colors.red, size: 40),
                       ),
                     ],
@@ -56,7 +146,6 @@ class StationDetail extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // 2. BASIC INFO SECTION
                   _buildSectionTitle("Basic Information"),
                   _buildInfoTile("Station Code", stationData['stationCode'], Icons.qr_code),
                   _buildInfoTile("Station Type", stationData['stationType'], Icons.category_outlined),
@@ -64,26 +153,26 @@ class StationDetail extends StatelessWidget {
                   
                   const Divider(height: 40),
 
-                  // 3. LOCATION DETAILS
                   _buildSectionTitle("Location Details"),
                   _buildInfoTile("Physical Address", stationData['address'], Icons.map_outlined),
                   _buildInfoTile("GPS Coordinates", "${location.latitude.toStringAsFixed(4)}, ${location.longitude.toStringAsFixed(4)}", Icons.explore_outlined),
 
                   const Divider(height: 40),
 
-                  // 4. MANAGEMENT DETAILS
                   _buildSectionTitle("Management"),
                   _buildInfoTile("Station Manager", stationData['managerName'], Icons.person_outline),
                   _buildInfoTile("Contact Phone", stationData['contactPhone'], Icons.phone_outlined),
 
                   const Divider(height: 40),
 
-                  // 5. DRIVERS RELATION LIST
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      _buildSectionTitle("Assigned Drivers"),
-                      const Icon(Icons.local_shipping_outlined, color: Colors.grey, size: 20),
+                      _buildSectionTitle("Current Fleet"),
+                      IconButton(
+                        onPressed: () => _showAssignDriverSheet(context),
+                        icon: Icon(Icons.add_circle, color: Theme.of(context).colorScheme.primary),
+                      )
                     ],
                   ),
                   const SizedBox(height: 10),
@@ -99,12 +188,15 @@ class StationDetail extends StatelessWidget {
                       }
                       if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
                         return Container(
-                          padding: const EdgeInsets.all(20),
-                          decoration: BoxDecoration(
-                            color: Colors.grey[50],
-                            borderRadius: BorderRadius.circular(12),
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(30),
+                          decoration: BoxDecoration(color: Colors.grey[50], borderRadius: BorderRadius.circular(15)),
+                          child: Column(
+                            children: [
+                              const Text("No drivers assigned.", style: TextStyle(color: Colors.grey)),
+                              TextButton(onPressed: () => _showAssignDriverSheet(context), child: const Text("Assign Now"))
+                            ],
                           ),
-                          child: const Center(child: Text("No drivers assigned to this hub.", style: TextStyle(color: Colors.grey))),
                         );
                       }
 
@@ -114,7 +206,8 @@ class StationDetail extends StatelessWidget {
                         itemCount: snapshot.data!.docs.length,
                         separatorBuilder: (_, __) => const SizedBox(height: 8),
                         itemBuilder: (context, index) {
-                          var driver = snapshot.data!.docs[index].data() as Map<String, dynamic>;
+                          var doc = snapshot.data!.docs[index];
+                          var driver = doc.data() as Map<String, dynamic>;
                           return ListTile(
                             contentPadding: const EdgeInsets.symmetric(horizontal: 12),
                             tileColor: Colors.grey[50],
@@ -125,7 +218,16 @@ class StationDetail extends StatelessWidget {
                             ),
                             title: Text(driver['fullName'], style: const TextStyle(fontWeight: FontWeight.bold)),
                             subtitle: Text(driver['vehicleType']),
-                            trailing: _buildStatusBadge(driver['status']),
+                            trailing: PopupMenuButton(
+                              itemBuilder: (context) => [
+                                const PopupMenuItem(value: 'remove', child: Text("Remove from Station", style: TextStyle(color: Colors.red))),
+                              ],
+                              onSelected: (val) async {
+                                if (val == 'remove') {
+                                  await FirebaseFirestore.instance.collection('drivers').doc(doc.id).update({'stationId': ''});
+                                }
+                              },
+                            ),
                           );
                         },
                       );
@@ -141,7 +243,6 @@ class StationDetail extends StatelessWidget {
     );
   }
 
-  // --- Helper Widgets ---
 
   Widget _buildSectionTitle(String title) {
     return Padding(

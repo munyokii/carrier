@@ -3,9 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:carrier/screens/pages/customer/find_carrier_screen.dart';
-// import 'package:carrier/screens/pages/customer/track_package_screen.dart';
 import 'package:carrier/models/booking_model.dart';
-// import 'package:carrier/screens/pages/customer/package_detail_screen.dart';
 import 'package:intl/intl.dart';
 
 class CustomerDashboard extends StatefulWidget {
@@ -34,12 +32,16 @@ class _CustomerDashboardState extends State<CustomerDashboard> {
 
   Future<void> _loadUserData() async {
     if (_user != null) {
-      final doc = await FirebaseFirestore.instance
-          .collection('users')
-          .doc(_user.uid)
-          .get();
-      if (doc.exists && mounted) {
-        setState(() => _userData = doc.data());
+      try {
+        final doc = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(_user.uid)
+            .get();
+        if (doc.exists && mounted) {
+          setState(() => _userData = doc.data());
+        }
+      } catch (e) {
+        debugPrint("Error loading user data: $e");
       }
     }
   }
@@ -126,7 +128,8 @@ class _CustomerDashboardState extends State<CustomerDashboard> {
         CircleAvatar(
           radius: 28,
           backgroundColor: primary.withOpacity(0.1),
-          child: Text(name[0].toUpperCase(), style: TextStyle(color: primary, fontWeight: FontWeight.bold, fontSize: 20)),
+          child: Text(name.isNotEmpty ? name[0].toUpperCase() : '?', 
+              style: TextStyle(color: primary, fontWeight: FontWeight.bold, fontSize: 20)),
         ),
         const SizedBox(width: 12),
         Expanded(
@@ -237,8 +240,8 @@ class _CustomerDashboardState extends State<CustomerDashboard> {
       crossAxisSpacing: 10,
       children: [
         _buildCircularAction(Icons.local_shipping, "Send", primaryColor, () => _navTo(const FindCarrierScreen())),
-        _buildCircularAction(Icons.track_changes, "Track", Colors.blue, () => _navTo(const Placeholder())),
-        _buildCircularAction(Icons.inventory, "History", Colors.purple, () => _navTo(const Placeholder())),
+        _buildCircularAction(Icons.track_changes, "Track", Colors.blue, () {}),
+        _buildCircularAction(Icons.inventory, "History", Colors.purple, () {}),
         _buildCircularAction(Icons.help_center, "Support", Colors.teal, () {}),
       ],
     );
@@ -272,8 +275,20 @@ class _CustomerDashboardState extends State<CustomerDashboard> {
               .collection('bookings')
               .where('userId', isEqualTo: _user?.uid)
               .where('status', whereIn: ['pending', 'accepted', 'in_transit'])
+              .orderBy('createdAt', descending: true) 
               .snapshots(),
           builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const Center(child: CircularProgressIndicator());
+            }
+            if (snapshot.hasError) {
+              return Center(
+                child: Text(
+                  "Index Building: Check Firebase Console", 
+                  style: TextStyle(color: Colors.orange[800], fontSize: 12)
+                ),
+              );
+            }
             if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
               return _buildEmptyState("No active deliveries", Icons.local_shipping_outlined);
             }
@@ -344,8 +359,19 @@ class _CustomerDashboardState extends State<CustomerDashboard> {
         const Text('Recent History', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
         const SizedBox(height: 15),
         StreamBuilder<QuerySnapshot>(
-          stream: FirebaseFirestore.instance.collection('bookings').where('userId', isEqualTo: _user?.uid).limit(5).snapshots(),
+          stream: FirebaseFirestore.instance
+              .collection('bookings')
+              .where('userId', isEqualTo: _user?.uid)
+              .orderBy('createdAt', descending: true) 
+              .limit(5)
+              .snapshots(),
           builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const Center(child: CircularProgressIndicator());
+            }
+            if (snapshot.hasError) {
+              return const Text("Index building in progress...");
+            }
             if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
               return _buildEmptyState("No recent activity", Icons.history);
             }

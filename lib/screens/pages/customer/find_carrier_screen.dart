@@ -1,3 +1,6 @@
+import 'dart:convert';
+import 'package:http/http.dart' as http;
+import 'package:uuid/uuid.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart'; 
 import 'package:latlong2/latlong.dart';      
@@ -15,16 +18,34 @@ class FindCarrierScreen extends StatefulWidget {
 
 class _FindCarrierScreenState extends State<FindCarrierScreen> {
   final MapController _mapController = MapController();
-  Position? _currentPosition;
+  final TextEditingController _searchController = TextEditingController();
   
-  // Changed to store data with its calculated distance for easier sorting
-  List<Map<String, dynamic>> _nearbyStations = []; 
+  Position? _currentPosition;
+  List<Map<String, dynamic>> _allNearbyStations = []; 
+  List<Map<String, dynamic>> _filteredStations = [];  
   bool _isLoading = true;
 
   @override
   void initState() {
     super.initState();
     _determinePosition();
+    _searchController.addListener(_onSearchChanged);
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  void _onSearchChanged() {
+    String query = _searchController.text.toLowerCase();
+    setState(() {
+      _filteredStations = _allNearbyStations.where((station) {
+        String name = station['stationName'].toString().toLowerCase();
+        return name.contains(query);
+      }).toList();
+    });
   }
 
   Future<void> _determinePosition() async {
@@ -52,13 +73,12 @@ class _FindCarrierScreenState extends State<FindCarrierScreen> {
         .where('status', isEqualTo: 'active')
         .get();
 
-    List<Map<String, dynamic>> filteredList = [];
+    List<Map<String, dynamic>> tempStations = [];
 
     for (var doc in snapshot.docs) {
       final data = doc.data();
       final GeoPoint point = data['coordinates'];
       
-      // 1. Calculate distance in meters
       double distanceInMeters = Geolocator.distanceBetween(
         _currentPosition!.latitude,
         _currentPosition!.longitude,
@@ -68,20 +88,19 @@ class _FindCarrierScreenState extends State<FindCarrierScreen> {
 
       double distanceInKm = distanceInMeters / 1000;
 
-      // 2. Filter: Only include stations within 30km
       if (distanceInKm <= 30.0) {
-        data['id'] = doc.id; // Store ID for booking
-        data['distance'] = distanceInKm; // Store distance for sorting
-        filteredList.add(data);
+        data['id'] = doc.id; 
+        data['distance'] = distanceInKm;
+        tempStations.add(data);
       }
     }
 
-    // 3. Sort: Ascending (Closest to Furthest)
-    filteredList.sort((a, b) => a['distance'].compareTo(b['distance']));
+    tempStations.sort((a, b) => a['distance'].compareTo(b['distance']));
 
     if (mounted) {
       setState(() {
-        _nearbyStations = filteredList;
+        _allNearbyStations = tempStations;
+        _filteredStations = tempStations;
         _isLoading = false;
       });
     }
@@ -93,7 +112,7 @@ class _FindCarrierScreenState extends State<FindCarrierScreen> {
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (context) => _BookingBottomSheet(
-        stationData: stationData, // Pass the Map instead of DocumentSnapshot
+        stationData: stationData,
         userLocation: _currentPosition!,
       ),
     );
@@ -104,7 +123,6 @@ class _FindCarrierScreenState extends State<FindCarrierScreen> {
     return Scaffold(
       body: Stack(
         children: [
-          // Map Layer
           _currentPosition == null
               ? const Center(child: CircularProgressIndicator())
               : FlutterMap(
@@ -120,14 +138,12 @@ class _FindCarrierScreenState extends State<FindCarrierScreen> {
                     ),
                     MarkerLayer(
                       markers: [
-                        // Current Position Marker
                         Marker(
                           point: LatLng(_currentPosition!.latitude, _currentPosition!.longitude),
                           width: 40, height: 40,
                           child: const Icon(Icons.my_location, color: Colors.blue, size: 30),
                         ),
-                        // Station Markers (Filtered)
-                        ..._nearbyStations.map((data) {
+                        ..._filteredStations.map((data) {
                           GeoPoint point = data['coordinates'];
                           return Marker(
                             point: LatLng(point.latitude, point.longitude),
@@ -143,40 +159,51 @@ class _FindCarrierScreenState extends State<FindCarrierScreen> {
                   ],
                 ),
 
-          // Header Overlay (Back & Search)
           Positioned(
             top: 50, left: 20, right: 20,
             child: Row(
               children: [
                 CircleAvatar(
                   backgroundColor: Colors.white,
-                  child: IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => Navigator.pop(context)),
+                  child: IconButton(icon: const Icon(Icons.arrow_back, color: Colors.black), onPressed: () => Navigator.pop(context)),
                 ),
                 const SizedBox(width: 15),
-                const Expanded(
-                  child: Text("Hubs within 30km", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.black87)),
+                Expanded(
+                  child: Container(
+                    height: 50,
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(15),
+                      boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 10, offset: const Offset(0, 4))],
+                    ),
+                    child: TextField(
+                      controller: _searchController,
+                      decoration: const InputDecoration(
+                        hintText: "Search stations by name...",
+                        prefixIcon: Icon(Icons.search, color: Colors.grey),
+                        border: InputBorder.none,
+                        contentPadding: EdgeInsets.symmetric(vertical: 15),
+                      ),
+                    ),
+                  ),
                 ),
               ],
             ),
           ),
 
-          // Horizontal Carousel
           Positioned(
             bottom: 20, left: 0, right: 0,
             child: SizedBox(
               height: 180,
               child: _isLoading 
                 ? const SizedBox.shrink()
-                : _nearbyStations.isEmpty 
-                  ? _buildNoStationsFound()
+                : _filteredStations.isEmpty 
+                  ? _buildNoResultsFound()
                   : ListView.builder(
                       scrollDirection: Axis.horizontal,
                       padding: const EdgeInsets.symmetric(horizontal: 20),
-                      itemCount: _nearbyStations.length,
-                      itemBuilder: (context, index) {
-                        final data = _nearbyStations[index];
-                        return _buildStationCard(data);
-                      },
+                      itemCount: _filteredStations.length,
+                      itemBuilder: (context, index) => _buildStationCard(_filteredStations[index]),
                     ),
             ),
           ),
@@ -194,11 +221,11 @@ class _FindCarrierScreenState extends State<FindCarrierScreen> {
       child: Container(
         width: 280,
         margin: const EdgeInsets.only(right: 15),
-        padding: const EdgeInsets.all(15),
+        padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(20),
-          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10)],
+          color: Colors.white, 
+          borderRadius: BorderRadius.circular(20), 
+          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 15)]
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -206,22 +233,22 @@ class _FindCarrierScreenState extends State<FindCarrierScreen> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(color: Colors.blue[50], borderRadius: BorderRadius.circular(10)),
-                  child: Text(data['stationType'] ?? "Hub", style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.blue)),
-                ),
-                // Display calculated distance
-                Text("${data['distance'].toStringAsFixed(1)} km", style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.green)),
+                Text(data['stationType']?.toUpperCase() ?? "HUB", 
+                    style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w900, color: Colors.blue, letterSpacing: 1)),
+                Text("${data['distance'].toStringAsFixed(1)} km", 
+                    style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.green, fontSize: 12)),
               ],
             ),
             const SizedBox(height: 10),
             Text(data['stationName'], style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-            Text(data['address'], maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: Colors.grey[600], fontSize: 13)),
+            Text(data['address'], maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: Colors.grey[600], fontSize: 12)),
             const Spacer(),
             ElevatedButton(
               onPressed: () => _showBookingSheet(data),
-              style: ElevatedButton.styleFrom(minimumSize: const Size(double.infinity, 40), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))),
+              style: ElevatedButton.styleFrom(
+                minimumSize: const Size(double.infinity, 40),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))
+              ),
               child: const Text("Book Delivery"),
             )
           ],
@@ -230,13 +257,12 @@ class _FindCarrierScreenState extends State<FindCarrierScreen> {
     );
   }
 
-  Widget _buildNoStationsFound() {
+  Widget _buildNoResultsFound() {
     return Center(
       child: Container(
-        margin: const EdgeInsets.symmetric(horizontal: 20),
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20)),
-        child: const Text("No stations found within 30km of your location.", textAlign: TextAlign.center),
+        child: const Text("No matching hubs within 30km.", style: TextStyle(fontWeight: FontWeight.w500)),
       ),
     );
   }
@@ -255,11 +281,41 @@ class _BookingBottomSheet extends StatefulWidget {
 class _BookingBottomSheetState extends State<_BookingBottomSheet> {
   final _itemController = TextEditingController();
   final _addressController = TextEditingController();
+  final _weightController = TextEditingController(); // NEW Weight Controller
+  
+  List<dynamic> _placePredictions = [];
+  final String _googleMapsApiKey = "YOUR_GOOGLE_PLACES_API_KEY"; 
+  final String _sessionToken = const Uuid().v4(); 
+
   String _selectedVehicle = 'Motorbike';
   bool _isSubmitting = false;
 
+  Future<void> _getPlacePredictions(String query) async {
+    if (query.isEmpty) {
+      setState(() => _placePredictions = []);
+      return;
+    }
+
+    final String url = 
+      "https://maps.googleapis.com/maps/api/place/autocomplete/json?input=$query&key=$_googleMapsApiKey&sessiontoken=$_sessionToken";
+
+    try {
+      final response = await http.get(Uri.parse(url));
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        setState(() => _placePredictions = data['predictions']);
+      }
+    } catch (e) {
+      debugPrint("Autocomplete Error: $e");
+    }
+  }
+
   void _submitBooking() async {
-    if (_itemController.text.isEmpty || _addressController.text.isEmpty) return;
+    if (_itemController.text.isEmpty || _addressController.text.isEmpty || _weightController.text.isEmpty) {
+       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Please fill all fields")));
+       return;
+    }
+
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
     setState(() => _isSubmitting = true);
@@ -274,11 +330,12 @@ class _BookingBottomSheetState extends State<_BookingBottomSheet> {
         carrierName: 'Searching...',
         vehicleType: _selectedVehicle,
         itemDescription: _itemController.text.trim(),
+        weight: double.tryParse(_weightController.text) ?? 0.0, // NEW field added to model call
         pickupAddress: widget.stationData['address'],
         pickupLocation: widget.stationData['coordinates'],
         deliveryAddress: _addressController.text.trim(),
-        deliveryLocation: const GeoPoint(0, 0),
-        distance: widget.stationData['distance'], // Use the distance we already calculated
+        deliveryLocation: const GeoPoint(0, 0), 
+        distance: widget.stationData['distance'],
         pickupDateTime: DateTime.now().add(const Duration(hours: 1)),
         status: 'pending',
         createdAt: DateTime.now(),
@@ -288,7 +345,7 @@ class _BookingBottomSheetState extends State<_BookingBottomSheet> {
 
       if (mounted) {
         Navigator.pop(context);
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Booking request sent!"), backgroundColor: Colors.green));
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Booking Sent!"), backgroundColor: Colors.green));
       }
     } catch (e) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: $e"), backgroundColor: Colors.red));
@@ -302,40 +359,93 @@ class _BookingBottomSheetState extends State<_BookingBottomSheet> {
     return Container(
       padding: EdgeInsets.only(top: 25, left: 25, right: 25, bottom: MediaQuery.of(context).viewInsets.bottom + 25),
       decoration: const BoxDecoration(color: Colors.white, borderRadius: BorderRadius.vertical(top: Radius.circular(30))),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Center(child: Container(width: 50, height: 5, decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(10)))),
-          const SizedBox(height: 20),
-          Text("Book to ${widget.stationData['stationName']}", style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
-          const SizedBox(height: 20),
-          _buildInput("Item Description", _itemController, Icons.inventory_2_outlined),
-          const SizedBox(height: 15),
-          _buildInput("Delivery Destination", _addressController, Icons.location_on_outlined),
-          const SizedBox(height: 20),
-          const Text("Select Transport", style: TextStyle(fontWeight: FontWeight.bold)),
-          const SizedBox(height: 10),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: ['Motorbike', 'Van', 'Truck'].map((v) => ChoiceChip(
-              label: Text(v),
-              selected: _selectedVehicle == v,
-              onSelected: (s) => setState(() => _selectedVehicle = v),
-            )).toList(),
-          ),
-          const SizedBox(height: 30),
-          SizedBox(
-            width: double.infinity, height: 55,
-            child: ElevatedButton(
-              onPressed: _isSubmitting ? null : _submitBooking,
-              style: ElevatedButton.styleFrom(shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15))),
-              child: _isSubmitting 
-                ? const CircularProgressIndicator(color: Colors.white)
-                : const Text("Confirm Booking", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(child: Container(width: 50, height: 5, decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(10)))),
+            const SizedBox(height: 20),
+            Text("Book to ${widget.stationData['stationName']}", style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 20),
+            _buildInput("Item Description", _itemController, Icons.inventory_2_outlined),
+            const SizedBox(height: 15),
+            
+            // WEIGHT FIELD
+            TextField(
+              controller: _weightController,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              decoration: InputDecoration(
+                hintText: "Package Weight",
+                suffixText: "kg",
+                prefixIcon: const Icon(Icons.fitness_center_outlined),
+                filled: true,
+                fillColor: Colors.grey[100],
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: BorderSide.none),
+              ),
             ),
-          ),
-        ],
+            const SizedBox(height: 15),
+
+            // DELIVERY DESTINATION
+            TextField(
+              controller: _addressController,
+              onChanged: _getPlacePredictions,
+              decoration: InputDecoration(
+                hintText: "Delivery Destination",
+                prefixIcon: const Icon(Icons.location_on_outlined),
+                filled: true,
+                fillColor: Colors.grey[100],
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: BorderSide.none),
+              ),
+            ),
+
+            if (_placePredictions.isNotEmpty)
+              Container(
+                margin: const EdgeInsets.only(top: 5),
+                decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(15), border: Border.all(color: Colors.grey.shade200)),
+                constraints: const BoxConstraints(maxHeight: 150),
+                child: ListView.builder(
+                  shrinkWrap: true,
+                  itemCount: _placePredictions.length,
+                  itemBuilder: (context, index) {
+                    final prediction = _placePredictions[index];
+                    return ListTile(
+                      title: Text(prediction['description'], style: const TextStyle(fontSize: 13)),
+                      onTap: () {
+                        setState(() {
+                          _addressController.text = prediction['description'];
+                          _placePredictions = [];
+                        });
+                      },
+                    );
+                  },
+                ),
+              ),
+
+            const SizedBox(height: 20),
+            const Text("Select Transport", style: TextStyle(fontWeight: FontWeight.bold)),
+            const SizedBox(height: 10),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: ['Motorbike', 'Van', 'Truck'].map((v) => ChoiceChip(
+                label: Text(v),
+                selected: _selectedVehicle == v,
+                onSelected: (s) => setState(() => _selectedVehicle = v),
+              )).toList(),
+            ),
+            const SizedBox(height: 30),
+            SizedBox(
+              width: double.infinity, height: 55,
+              child: ElevatedButton(
+                onPressed: _isSubmitting ? null : _submitBooking,
+                style: ElevatedButton.styleFrom(shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15))),
+                child: _isSubmitting 
+                  ? const CircularProgressIndicator(color: Colors.white)
+                  : const Text("Confirm Booking", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

@@ -51,6 +51,8 @@
 	<string>We need your location to track your package delivery in real-time.</string>
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
 	<string>We need your location to find nearby carrier vehicles and provide accurate delivery services.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>This app needs camera access to scan tracking QR codes.</string>
 	<key>LSApplicationQueriesSchemes</key>
 	<array>
 		<string>tel</string>

@@ -8,8 +8,22 @@ import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 
-class AllBookings extends StatelessWidget {
+class AllBookings extends StatefulWidget {
   const AllBookings({super.key});
+
+  @override
+  State<AllBookings> createState() => _AllBookingsState();
+}
+
+class _AllBookingsState extends State<AllBookings> {
+  final TextEditingController _searchController = TextEditingController();
+  String _searchQuery = "";
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
 
   Future<void> _printQrLabel(BookingModel booking) async {
     final doc = pw.Document();
@@ -21,9 +35,14 @@ class AllBookings extends StatelessWidget {
           children: [
             pw.Text("SWIFTLINE CARRIER", style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold)),
             pw.SizedBox(height: 10),
-            pw.BarcodeWidget(data: booking.id, barcode: pw.Barcode.qrCode(), width: 100, height: 100),
+            pw.BarcodeWidget(
+              data: booking.trackingNumber, 
+              barcode: pw.Barcode.qrCode(), 
+              width: 100, 
+              height: 100
+            ),
             pw.SizedBox(height: 10),
-            pw.Text("ID: ${booking.id.toUpperCase()}", style: const pw.TextStyle(fontSize: 8)),
+            pw.Text("TRACKING ID: ${booking.trackingNumber}", style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold)),
             pw.Divider(),
             pw.Text("Item: ${booking.itemDescription}", style: const pw.TextStyle(fontSize: 9)),
             pw.Text("Dest: ${booking.deliveryAddress}", style: const pw.TextStyle(fontSize: 8)),
@@ -31,7 +50,7 @@ class AllBookings extends StatelessWidget {
         ),
       ),
     );
-    await Printing.layoutPdf(onLayout: (format) async => doc.save(), name: 'Label_${booking.id}');
+    await Printing.layoutPdf(onLayout: (format) async => doc.save(), name: 'Label_${booking.trackingNumber}');
   }
 
   @override
@@ -46,16 +65,53 @@ class AllBookings extends StatelessWidget {
           backgroundColor: Colors.white,
           foregroundColor: Colors.black,
           elevation: 0.5,
-          bottom: TabBar(
-            labelColor: Theme.of(context).colorScheme.primary, 
-            unselectedLabelColor: Colors.grey, 
-            indicatorColor: Theme.of(context).colorScheme.primary, 
-            indicatorWeight: 3,
-            tabs: const [
-              Tab(text: "Pending"),
-              Tab(text: "Accepted"),
-              Tab(text: "Cancelled"),
-            ],
+          bottom: PreferredSize(
+            preferredSize: const Size.fromHeight(110),
+            child: Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  child: TextField(
+                    controller: _searchController,
+                    textCapitalization: TextCapitalization.characters,
+                    onChanged: (value) {
+                      setState(() => _searchQuery = value.trim().toUpperCase());
+                    },
+                    decoration: InputDecoration(
+                      hintText: "Search Tracking ID (e.g. SWFT-X123)",
+                      prefixIcon: const Icon(Icons.search, size: 20),
+                      suffixIcon: _searchQuery.isNotEmpty 
+                        ? IconButton(
+                            icon: const Icon(Icons.clear, size: 20),
+                            onPressed: () {
+                              _searchController.clear();
+                              setState(() => _searchQuery = "");
+                            },
+                          )
+                        : null,
+                      filled: true,
+                      fillColor: const Color(0xFFF1F3F4),
+                      contentPadding: const EdgeInsets.symmetric(vertical: 0),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide.none,
+                      ),
+                    ),
+                  ),
+                ),
+                TabBar(
+                  labelColor: Theme.of(context).colorScheme.primary,
+                  unselectedLabelColor: Colors.grey,
+                  indicatorColor: Theme.of(context).colorScheme.primary,
+                  indicatorWeight: 3,
+                  tabs: const [
+                    Tab(text: "Pending"),
+                    Tab(text: "Accepted"),
+                    Tab(text: "Cancelled"),
+                  ],
+                ),
+              ],
+            ),
           ),
         ),
         body: TabBarView(
@@ -70,15 +126,29 @@ class AllBookings extends StatelessWidget {
   }
 
   Widget _buildBookingList(String status) {
+    Query query = FirebaseFirestore.instance
+        .collection('bookings')
+        .where('status', isEqualTo: status);
+
+    if (_searchQuery.isNotEmpty) {
+      query = query
+          .where('trackingNumber', isGreaterThanOrEqualTo: _searchQuery)
+          .where('trackingNumber', isLessThanOrEqualTo: '$_searchQuery\uf8ff');
+    } else {
+      query = query.orderBy('createdAt', descending: true);
+    }
+
     return StreamBuilder<QuerySnapshot>(
-      stream: FirebaseFirestore.instance
-          .collection('bookings')
-          .where('status', isEqualTo: status)
-          .orderBy('createdAt', descending: true)
-          .snapshots(),
+      stream: query.snapshots(),
       builder: (context, snapshot) {
         if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
-        if (snapshot.data!.docs.isEmpty) return Center(child: Text("No $status bookings."));
+        if (snapshot.data!.docs.isEmpty) {
+          return Center(
+            child: Text(_searchQuery.isEmpty 
+              ? "No $status bookings." 
+              : "No results for '$_searchQuery'"),
+          );
+        }
 
         return ListView.builder(
           padding: const EdgeInsets.all(16),
@@ -95,6 +165,7 @@ class AllBookings extends StatelessWidget {
     );
   }
 
+  
   Widget _buildBookingCard(BuildContext context, BookingModel booking) {
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
@@ -119,6 +190,7 @@ class AllBookings extends StatelessWidget {
               ),
               const SizedBox(height: 10),
               Text(booking.itemDescription, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+              Text("ID: ${booking.trackingNumber}", style: const TextStyle(color: Colors.grey, fontSize: 12)),
               const Divider(height: 25, color: Color(0xFFF5F5F5)),
               if (booking.status == 'pending')
                 SizedBox(
@@ -166,13 +238,10 @@ class AllBookings extends StatelessWidget {
             padding: const EdgeInsets.all(24),
             child: Column(
               children: [
-                QrImageView(
-                  data: booking.id, 
-                  size: 180,
-                  backgroundColor: Colors.white,
-                ),
+                QrImageView(data: booking.trackingNumber, size: 180, backgroundColor: Colors.white),
                 const SizedBox(height: 10),
-                const Text("SCAN TO TRACK", style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 2, fontSize: 10)),
+                Text(booking.trackingNumber, style: const TextStyle(fontWeight: FontWeight.bold, letterSpacing: 2, fontSize: 18)),
+                const Text("SCAN TO TRACK", style: TextStyle(color: Colors.grey, fontSize: 10, letterSpacing: 1.2)),
                 const Divider(height: 40, color: Color(0xFFF5F5F5)),
                 _buildDetailRow("Item", booking.itemDescription),
                 _buildDetailRow("Weight", "${booking.weight} kg"),
@@ -201,20 +270,12 @@ class AllBookings extends StatelessWidget {
 
   Widget _buildStatusHistory(String bookingId) {
     return StreamBuilder<QuerySnapshot>(
-      stream: FirebaseFirestore.instance
-          .collection('bookings')
-          .doc(bookingId)
-          .collection('status_history')
-          .orderBy('timestamp', descending: true)
-          .snapshots(),
+      stream: FirebaseFirestore.instance.collection('bookings').doc(bookingId).collection('status_history').orderBy('timestamp', descending: true).snapshots(),
       builder: (context, snapshot) {
         if (!snapshot.hasData) return const SizedBox.shrink();
         final logs = snapshot.data!.docs;
         return Container(
-          decoration: BoxDecoration(
-            color: const Color(0xFFFAFAFA),
-            borderRadius: BorderRadius.circular(15),
-          ),
+          decoration: BoxDecoration(color: const Color(0xFFFAFAFA), borderRadius: BorderRadius.circular(15)),
           padding: const EdgeInsets.all(15),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,

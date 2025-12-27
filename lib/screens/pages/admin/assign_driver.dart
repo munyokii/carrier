@@ -16,15 +16,30 @@ class _AssignDriverState extends State<AssignDriver> {
   Future<void> _assignDriverToBooking(String driverId, String driverName) async {
     setState(() => _isProcessing = true);
     try {
-      await FirebaseFirestore.instance.collection('bookings').doc(widget.booking.id).update({
+      final bookingRef = FirebaseFirestore.instance.collection('bookings').doc(widget.booking.id);
+      final WriteBatch batch = FirebaseFirestore.instance.batch();
+
+      // 1. Update Booking Status
+      batch.update(bookingRef, {
         'status': 'accepted',
         'carrierId': driverId,
         'carrierName': driverName,
         'updatedAt': FieldValue.serverTimestamp(),
       });
 
+      // 2. Create Activity Log in Subcollection
+      final historyRef = bookingRef.collection('status_history').doc();
+      batch.set(historyRef, {
+        'status': 'accepted',
+        'message': 'Driver $driverName assigned by Admin',
+        'timestamp': FieldValue.serverTimestamp(),
+        'updatedBy': 'Admin',
+      });
+
+      await batch.commit();
+
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Driver Assigned! Booking Accepted.")));
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Driver Assigned & Logged!")));
         Navigator.pop(context);
       }
     } catch (e) {
@@ -48,9 +63,7 @@ class _AssignDriverState extends State<AssignDriver> {
                 .snapshots(),
             builder: (context, snapshot) {
               if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
-              if (snapshot.data!.docs.isEmpty) {
-                return const Center(child: Text("No available drivers at this hub."));
-              }
+              if (snapshot.data!.docs.isEmpty) return const Center(child: Text("No drivers available at this hub."));
 
               return ListView.builder(
                 itemCount: snapshot.data!.docs.length,

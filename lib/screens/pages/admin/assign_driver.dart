@@ -19,7 +19,6 @@ class _AssignDriverState extends State<AssignDriver> {
       final bookingRef = FirebaseFirestore.instance.collection('bookings').doc(widget.booking.id);
       final WriteBatch batch = FirebaseFirestore.instance.batch();
 
-      // 1. Update Booking Status
       batch.update(bookingRef, {
         'status': 'accepted',
         'carrierId': driverId,
@@ -27,19 +26,22 @@ class _AssignDriverState extends State<AssignDriver> {
         'updatedAt': FieldValue.serverTimestamp(),
       });
 
-      // 2. Create Activity Log in Subcollection
       final historyRef = bookingRef.collection('status_history').doc();
       batch.set(historyRef, {
         'status': 'accepted',
         'message': 'Driver $driverName assigned by Admin',
         'timestamp': FieldValue.serverTimestamp(),
         'updatedBy': 'Admin',
+        'userId': widget.booking.userId,
+        'read': false,
       });
 
       await batch.commit();
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Driver Assigned & Logged!")));
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Driver Assigned & Customer Notified!"))
+        );
         Navigator.pop(context);
       }
     } catch (e) {
@@ -52,32 +54,64 @@ class _AssignDriverState extends State<AssignDriver> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text("Select Driver")),
+      backgroundColor: const Color(0xFFF8F9FA),
+      appBar: AppBar(
+        title: const Text("Select Online Driver", style: TextStyle(fontWeight: FontWeight.bold)),
+        centerTitle: true,
+      ),
       body: _isProcessing 
         ? const Center(child: CircularProgressIndicator())
         : StreamBuilder<QuerySnapshot>(
             stream: FirebaseFirestore.instance
                 .collection('drivers')
-                .where('status', isEqualTo: 'active')
                 .where('stationId', isEqualTo: widget.booking.stationId)
+                .where('status', isEqualTo: 'active')
+                .where('isOnline', isEqualTo: true)
                 .snapshots(),
             builder: (context, snapshot) {
+              if (snapshot.hasError) {
+                return const Center(child: Text("Error: Check console to create index"));
+              }
               if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
-              if (snapshot.data!.docs.isEmpty) return const Center(child: Text("No drivers available at this hub."));
+              
+              if (snapshot.data!.docs.isEmpty) {
+                return Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.person_off_rounded, size: 64, color: Colors.grey[400]),
+                      const SizedBox(height: 16),
+                      const Text(
+                        "No online drivers at this hub.",
+                        style: TextStyle(color: Colors.grey, fontWeight: FontWeight.w500),
+                      ),
+                    ],
+                  ),
+                );
+              }
 
               return ListView.builder(
+                padding: const EdgeInsets.all(16),
                 itemCount: snapshot.data!.docs.length,
                 itemBuilder: (context, index) {
-                  final driver = snapshot.data!.docs[index].data() as Map<String, dynamic>;
-                  final dId = snapshot.data!.docs[index].id;
+                  final driverDoc = snapshot.data!.docs[index];
+                  final driver = driverDoc.data() as Map<String, dynamic>;
+                  final dId = driverDoc.id;
                   final dName = driver['fullName'] ?? "Unknown";
 
-                  return ListTile(
-                    leading: CircleAvatar(child: Text(dName[0])),
-                    title: Text(dName),
-                    subtitle: Text("${driver['vehicleType']} • ${driver['experienceYears']}y Exp"),
-                    trailing: const Icon(Icons.add_circle_outline, color: Colors.green),
-                    onTap: () => _assignDriverToBooking(dId, dName),
+                  return Card(
+                    margin: const EdgeInsets.only(bottom: 12),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    child: ListTile(
+                      leading: CircleAvatar(
+                        backgroundColor: Theme.of(context).primaryColor.withOpacity(0.1),
+                        child: Text(dName[0], style: TextStyle(color: Theme.of(context).primaryColor)),
+                      ),
+                      title: Text(dName, style: const TextStyle(fontWeight: FontWeight.bold)),
+                      subtitle: Text("${driver['vehicleType']} • ${driver['experienceYears']}y Exp"),
+                      trailing: const Icon(Icons.add_circle_outline, color: Colors.green),
+                      onTap: () => _assignDriverToBooking(dId, dName),
+                    ),
                   );
                 },
               );

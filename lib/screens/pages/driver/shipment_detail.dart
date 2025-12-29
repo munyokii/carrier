@@ -49,6 +49,7 @@ class _ShipmentDetailState extends State<ShipmentDetail> {
       'message': logMessage,
       'timestamp': FieldValue.serverTimestamp(),
       'userId': widget.booking.userId,
+      'read': false,
     });
 
     try {
@@ -323,9 +324,9 @@ class _ShipmentDetailState extends State<ShipmentDetail> {
           : Icon(isOut ? Icons.qr_code_scanner : Icons.local_shipping),
         onPressed: _isUpdating ? null : () {
           if (status == 'accepted') {
-            _updateStatus('out_for_delivery', "Driver started delivery.");
+            _updateStatus('out_for_delivery', "Your driver ${widget.booking.carrierName} is on the way to pick up the package.");
           } else if (isOut) {
-            _openScanner();
+            _openScanner(); 
           }
         },
         label: _isUpdating 

@@ -6,6 +6,7 @@ import 'package:carrier/screens/pages/customer/find_carrier_screen.dart';
 import 'package:carrier/screens/pages/customer/booking_detail.dart';
 import 'package:carrier/screens/pages/customer/track_package.dart';
 import 'package:carrier/screens/pages/customer/booking_history.dart';
+import 'package:carrier/screens/pages/customer/notification_screen.dart';
 import 'package:carrier/models/booking_model.dart';
 
 class CustomerDashboard extends StatefulWidget {
@@ -168,11 +169,47 @@ class _CustomerDashboardState extends State<CustomerDashboard> {
             ],
           ),
         ),
-        IconButton(
-          onPressed: () {
-            // Logic for notifications
+        StreamBuilder<QuerySnapshot>(
+          stream: FirebaseFirestore.instance
+              .collectionGroup('status_history')
+              .where('userId', isEqualTo: _user?.uid)
+              .where('read', isEqualTo: false)
+              .snapshots(),
+          builder: (context, snapshot) {
+            int unreadCount = snapshot.hasData ? snapshot.data!.docs.length : 0;
+
+            return IconButton(
+              onPressed: () {
+                Navigator.push(
+                  context, 
+                  MaterialPageRoute(builder: (context) => const NotificationsScreen())
+                );
+              },
+              icon: Stack(
+                children: [
+                  const Icon(Icons.notifications_none_rounded, color: Colors.black87, size: 28),
+                  if (unreadCount > 0)
+                    Positioned(
+                      right: 0,
+                      top: 0,
+                      child: Container(
+                        padding: const EdgeInsets.all(4),
+                        decoration: const BoxDecoration(
+                          color: Colors.red,
+                          shape: BoxShape.circle,
+                        ),
+                        constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
+                        child: Text(
+                          unreadCount > 9 ? '9+' : '$unreadCount',
+                          style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            );
           },
-          icon: const Icon(Icons.notifications_none_rounded, color: Colors.black87, size: 28),
         ),
         IconButton(
           onPressed: _handleLogout,

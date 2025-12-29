@@ -4,7 +4,6 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 
-// Import your screens
 import 'package:carrier/screens/login_screen.dart';
 import 'package:carrier/screens/pages/admin/add_station.dart';
 import 'package:carrier/screens/pages/admin/add_driver.dart';
@@ -13,6 +12,7 @@ import 'package:carrier/screens/pages/admin/driver_detail.dart';
 import 'package:carrier/screens/pages/admin/all_stations.dart';
 import 'package:carrier/screens/pages/admin/station_detail.dart';
 import 'package:carrier/screens/pages/admin/all_bookings.dart';
+import 'package:carrier/screens/pages/admin/admin_reports.dart';
 
 class AdminDashboard extends StatefulWidget {
   const AdminDashboard({super.key});
@@ -226,7 +226,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
       _buildActionTile(context, "Add Station", Icons.add_business, color, () => Navigator.push(context, MaterialPageRoute(builder: (c) => const AddStation()))),
       _buildActionTile(context, "Add Driver", Icons.person_add, Colors.indigo, () => Navigator.push(context, MaterialPageRoute(builder: (c) => const AddDriver()))),
       _buildActionTile(context, "Bookings", Icons.inventory_2, Colors.teal, () => Navigator.push(context, MaterialPageRoute(builder: (c) => const AllBookings()))),
-      _buildActionTile(context, "Reports", Icons.analytics, Colors.purple, () {}),
+      _buildActionTile(context, "Reports", Icons.analytics, Colors.purple, () => Navigator.push(context, MaterialPageRoute(builder: (c) => const AdminReports()))),
     ],
   );
 

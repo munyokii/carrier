@@ -43,10 +43,12 @@ class _ShipmentDetailState extends State<ShipmentDetail> {
     final historyRef = bookingRef.collection('status_history').doc();
 
     batch.update(bookingRef, {'status': newStatus});
+
     batch.set(historyRef, {
       'status': newStatus,
       'message': logMessage,
       'timestamp': FieldValue.serverTimestamp(),
+      'userId': widget.booking.userId,
     });
 
     try {

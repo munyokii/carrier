@@ -56,7 +56,7 @@ class _AllBookingsState extends State<AllBookings> {
   @override
   Widget build(BuildContext context) {
     return DefaultTabController(
-      length: 3,
+      length: 4,
       child: Scaffold(
         backgroundColor: const Color(0xFFF8F9FA),
         appBar: AppBar(
@@ -64,13 +64,14 @@ class _AllBookingsState extends State<AllBookings> {
           centerTitle: true,
           backgroundColor: Colors.white,
           foregroundColor: Colors.black,
-          elevation: 0.5,
+          elevation: 0,
           bottom: PreferredSize(
-            preferredSize: const Size.fromHeight(110),
+            preferredSize: const Size.fromHeight(115), 
             child: Column(
               children: [
+                // SEARCH BAR PADDING FIX
                 Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
                   child: TextField(
                     controller: _searchController,
                     textCapitalization: TextCapitalization.characters,
@@ -78,7 +79,7 @@ class _AllBookingsState extends State<AllBookings> {
                       setState(() => _searchQuery = value.trim().toUpperCase());
                     },
                     decoration: InputDecoration(
-                      hintText: "Search Tracking ID (e.g. SWFT-X123)",
+                      hintText: "Search Tracking ID...",
                       prefixIcon: const Icon(Icons.search, size: 20),
                       suffixIcon: _searchQuery.isNotEmpty 
                         ? IconButton(
@@ -91,7 +92,7 @@ class _AllBookingsState extends State<AllBookings> {
                         : null,
                       filled: true,
                       fillColor: const Color(0xFFF1F3F4),
-                      contentPadding: const EdgeInsets.symmetric(vertical: 0),
+                      contentPadding: EdgeInsets.zero,
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
                         borderSide: BorderSide.none,
@@ -99,14 +100,19 @@ class _AllBookingsState extends State<AllBookings> {
                     ),
                   ),
                 ),
+                // CENTERED NAVIGATION TAB BAR
                 TabBar(
+                  isScrollable: false, // Disabling this centers the tabs automatically
                   labelColor: Theme.of(context).colorScheme.primary,
-                  unselectedLabelColor: Colors.grey,
+                  unselectedLabelColor: Colors.grey[600],
                   indicatorColor: Theme.of(context).colorScheme.primary,
                   indicatorWeight: 3,
+                  indicatorPadding: const EdgeInsets.symmetric(horizontal: 10),
+                  labelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
                   tabs: const [
                     Tab(text: "Pending"),
                     Tab(text: "Accepted"),
+                    Tab(text: "Delivered"),
                     Tab(text: "Cancelled"),
                   ],
                 ),
@@ -116,19 +122,20 @@ class _AllBookingsState extends State<AllBookings> {
         ),
         body: TabBarView(
           children: [
-            _buildBookingList('pending'),
-            _buildBookingList('accepted'),
-            _buildBookingList('cancelled'),
+            _buildBookingList(statuses: ['pending']),
+            _buildBookingList(statuses: ['accepted', 'out_for_delivery']), 
+            _buildBookingList(statuses: ['delivered']), 
+            _buildBookingList(statuses: ['cancelled']),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildBookingList(String status) {
+  Widget _buildBookingList({required List<String> statuses}) {
     Query query = FirebaseFirestore.instance
         .collection('bookings')
-        .where('status', isEqualTo: status);
+        .where('status', whereIn: statuses);
 
     if (_searchQuery.isNotEmpty) {
       query = query
@@ -141,12 +148,21 @@ class _AllBookingsState extends State<AllBookings> {
     return StreamBuilder<QuerySnapshot>(
       stream: query.snapshots(),
       builder: (context, snapshot) {
+        if (snapshot.hasError) return Center(child: Text("Error: ${snapshot.error}"));
         if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
+        
         if (snapshot.data!.docs.isEmpty) {
           return Center(
-            child: Text(_searchQuery.isEmpty 
-              ? "No $status bookings." 
-              : "No results for '$_searchQuery'"),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.inventory_2_outlined, size: 50, color: Colors.grey[300]),
+                const SizedBox(height: 10),
+                Text(_searchQuery.isEmpty 
+                  ? "No bookings in this section." 
+                  : "No match for '$_searchQuery'"),
+              ],
+            ),
           );
         }
 
@@ -165,13 +181,15 @@ class _AllBookingsState extends State<AllBookings> {
     );
   }
 
-  
   Widget _buildBookingCard(BuildContext context, BookingModel booking) {
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
-      elevation: 0.5,
+      elevation: 0,
       color: Colors.white,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(15),
+        side: BorderSide(color: Colors.grey.withOpacity(0.15))
+      ),
       child: InkWell(
         borderRadius: BorderRadius.circular(15),
         onTap: () => _showBookingDetails(context, booking),
@@ -184,14 +202,16 @@ class _AllBookingsState extends State<AllBookings> {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text(booking.stationName.toUpperCase(), 
-                    style: const TextStyle(fontWeight: FontWeight.w900, color: Colors.blue, fontSize: 11)),
+                    style: const TextStyle(fontWeight: FontWeight.w900, color: Colors.blue, fontSize: 10, letterSpacing: 0.5)),
                   _buildStatusBadge(booking),
                 ],
               ),
               const SizedBox(height: 10),
               Text(booking.itemDescription, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-              Text("ID: ${booking.trackingNumber}", style: const TextStyle(color: Colors.grey, fontSize: 12)),
-              const Divider(height: 25, color: Color(0xFFF5F5F5)),
+              const SizedBox(height: 4),
+              Text("ID: ${booking.trackingNumber}", style: TextStyle(color: Colors.grey[600], fontSize: 12)),
+              const Divider(height: 25, color: Color(0xFFEEEEEE)),
+              
               if (booking.status == 'pending')
                 SizedBox(
                   width: double.infinity,
@@ -207,11 +227,18 @@ class _AllBookingsState extends State<AllBookings> {
                   ),
                 )
               else
-                const Row(
+                Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text("View Details", style: TextStyle(color: Colors.grey, fontSize: 12)), 
-                    Icon(Icons.chevron_right, size: 16, color: Colors.grey)
+                    Text(
+                      booking.status == 'delivered' ? "Delivery Completed" : "Currently En Route", 
+                      style: TextStyle(
+                        color: booking.status == 'delivered' ? Colors.green : Colors.orange[700], 
+                        fontSize: 12, 
+                        fontWeight: FontWeight.bold
+                      )
+                    ), 
+                    const Icon(Icons.chevron_right, size: 18, color: Colors.grey)
                   ],
                 ),
             ],
@@ -231,37 +258,34 @@ class _AllBookingsState extends State<AllBookings> {
         initialChildSize: 0.85,
         maxChildSize: 0.95,
         expand: false,
-        builder: (context, scrollController) => Container(
-          color: Colors.white,
-          child: SingleChildScrollView(
-            controller: scrollController,
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              children: [
-                QrImageView(data: booking.trackingNumber, size: 180, backgroundColor: Colors.white),
-                const SizedBox(height: 10),
-                Text(booking.trackingNumber, style: const TextStyle(fontWeight: FontWeight.bold, letterSpacing: 2, fontSize: 18)),
-                const Text("SCAN TO TRACK", style: TextStyle(color: Colors.grey, fontSize: 10, letterSpacing: 1.2)),
-                const Divider(height: 40, color: Color(0xFFF5F5F5)),
-                _buildDetailRow("Item", booking.itemDescription),
-                _buildDetailRow("Weight", "${booking.weight} kg"),
-                _buildDetailRow("Carrier", booking.carrierName),
-                const SizedBox(height: 30),
-                _buildStatusHistory(booking.id),
-                const SizedBox(height: 30),
-                ElevatedButton.icon(
-                  style: ElevatedButton.styleFrom(
-                    minimumSize: const Size(double.infinity, 55),
-                    backgroundColor: Theme.of(context).colorScheme.primary,
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-                  ),
-                  onPressed: () => _printQrLabel(booking),
-                  icon: const Icon(Icons.print),
-                  label: const Text("PRINT LABEL"),
+        builder: (context, scrollController) => SingleChildScrollView(
+          controller: scrollController,
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            children: [
+              QrImageView(data: booking.trackingNumber, size: 160, backgroundColor: Colors.white),
+              const SizedBox(height: 10),
+              Text(booking.trackingNumber, style: const TextStyle(fontWeight: FontWeight.bold, letterSpacing: 2, fontSize: 18)),
+              const Text("SCAN TO TRACK", style: TextStyle(color: Colors.grey, fontSize: 10, letterSpacing: 1.2)),
+              const Divider(height: 40, color: Color(0xFFF5F5F5)),
+              _buildDetailRow("Item", booking.itemDescription),
+              _buildDetailRow("Weight", "${booking.weight} kg"),
+              _buildDetailRow("Carrier", booking.carrierName),
+              const SizedBox(height: 20),
+              _buildStatusHistory(booking.id),
+              const SizedBox(height: 30),
+              ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(
+                  minimumSize: const Size(double.infinity, 55),
+                  backgroundColor: Theme.of(context).colorScheme.primary,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
                 ),
-              ],
-            ),
+                onPressed: () => _printQrLabel(booking),
+                icon: const Icon(Icons.print),
+                label: const Text("PRINT LABEL"),
+              ),
+            ],
           ),
         ),
       ),
@@ -275,21 +299,22 @@ class _AllBookingsState extends State<AllBookings> {
         if (!snapshot.hasData) return const SizedBox.shrink();
         final logs = snapshot.data!.docs;
         return Container(
-          decoration: BoxDecoration(color: const Color(0xFFFAFAFA), borderRadius: BorderRadius.circular(15)),
+          decoration: BoxDecoration(color: const Color(0xFFFAFAFA), borderRadius: BorderRadius.circular(15), border: Border.all(color: Colors.grey.shade100)),
           padding: const EdgeInsets.all(15),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text("ACTIVITY LOG", style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey)),
-              const SizedBox(height: 15),
+              const Text("ACTIVITY LOG", style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.grey, letterSpacing: 0.5)),
+              const SizedBox(height: 10),
               ...logs.map((doc) {
                 final data = doc.data() as Map<String, dynamic>;
                 final time = (data['timestamp'] as Timestamp?)?.toDate();
                 return ListTile(
                   contentPadding: EdgeInsets.zero,
-                  leading: const Icon(Icons.check_circle, color: Colors.green, size: 16),
-                  title: Text(data['message'] ?? 'Status updated', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
-                  subtitle: Text(time != null ? DateFormat('MMM dd, hh:mm a').format(time) : '...', style: const TextStyle(fontSize: 11)),
+                  visualDensity: VisualDensity.compact,
+                  leading: const Icon(Icons.check_circle, color: Colors.green, size: 14),
+                  title: Text(data['message'] ?? 'Status updated', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                  subtitle: Text(time != null ? DateFormat('MMM dd, hh:mm a').format(time) : '...', style: const TextStyle(fontSize: 10)),
                 );
               }).toList(),
             ],
@@ -300,22 +325,29 @@ class _AllBookingsState extends State<AllBookings> {
   }
 
   Widget _buildStatusBadge(BookingModel booking) {
-    Color color = booking.status == 'accepted' ? Colors.green : (booking.status == 'cancelled' ? Colors.red : Colors.orange);
+    Color color;
+    switch (booking.status) {
+      case 'accepted': color = Colors.green; break;
+      case 'delivered': color = Colors.blue; break;
+      case 'cancelled': color = Colors.red; break;
+      case 'out_for_delivery': color = Colors.purple; break;
+      default: color = Colors.orange;
+    }
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(color: color.withOpacity(0.1), borderRadius: BorderRadius.circular(6)),
-      child: Text(booking.status.toUpperCase(), style: TextStyle(color: color, fontSize: 9, fontWeight: FontWeight.bold)),
+      child: Text(booking.status.toUpperCase(), style: TextStyle(color: color, fontSize: 8, fontWeight: FontWeight.w900)),
     );
   }
 
   Widget _buildDetailRow(String label, String value) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
+      padding: const EdgeInsets.symmetric(vertical: 6),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween, 
         children: [
-          Text(label, style: const TextStyle(color: Colors.grey)), 
-          Expanded(child: Text(value, textAlign: TextAlign.end, style: const TextStyle(fontWeight: FontWeight.bold))),
+          Text(label, style: TextStyle(color: Colors.grey[600], fontSize: 13)), 
+          Expanded(child: Text(value, textAlign: TextAlign.end, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13))),
         ]
       ),
     );

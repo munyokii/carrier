@@ -512,7 +512,7 @@ class _BookingBottomSheetState extends State<_BookingBottomSheet> {
                 style: ElevatedButton.styleFrom(shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15))),
                 child: _isSubmitting 
                   ? const CircularProgressIndicator(color: Colors.white)
-                  : const Text("Booking...", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                  : const Text("Confirm Booking", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
               ),
             ),
           ],

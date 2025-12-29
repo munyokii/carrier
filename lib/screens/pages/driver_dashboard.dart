@@ -17,28 +17,84 @@ class DriverDashboard extends StatefulWidget {
 class _DriverDashboardState extends State<DriverDashboard> {
   final String _currentUid = FirebaseAuth.instance.currentUser!.uid;
   bool _isOnline = false;
+  String _driverName = "Driver";
+  String _initial = "D";
 
   @override
   void initState() {
     super.initState();
-    _loadDriverStatus();
+    _loadDriverData();
   }
 
-  void _loadDriverStatus() async {
+
+  void _loadDriverData() async {
     final doc = await FirebaseFirestore.instance.collection('drivers').doc(_currentUid).get();
     if (doc.exists && mounted) {
+      final data = doc.data();
       setState(() {
-        _isOnline = doc.data()?['isOnline'] ?? false;
+        _isOnline = data?['isOnline'] ?? false;
+        _driverName = data?['fullName'] ?? "Driver";
+        _initial = _driverName.isNotEmpty ? _driverName[0].toUpperCase() : "D";
       });
     }
   }
 
-  // 2. Sync online status to Firestore
   void _toggleOnlineStatus(bool value) async {
     setState(() => _isOnline = value);
     await FirebaseFirestore.instance.collection('drivers').doc(_currentUid).update({
       'isOnline': value,
     });
+  }
+
+  String _getGreeting() {
+    final hour = DateTime.now().hour;
+    if (hour < 12) return "Good Morning";
+    if (hour < 17) return "Good Afternoon";
+    return "Good Evening";
+  }
+
+  Color _getAvatarColor(String name) {
+    final List<Color> colors = [
+      Colors.blue, Colors.orange, Colors.purple, 
+      Colors.teal, Colors.indigo, Colors.deepOrange
+    ];
+    return colors[name.length % colors.length];
+  }
+
+  void _showLogoutDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text("Logout"),
+        content: const Text("Are you sure you want to log out?"),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text("Cancel", style: TextStyle(color: Colors.grey)),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              await FirebaseAuth.instance.signOut();
+
+              if (!context.mounted) return; 
+
+              Navigator.pushAndRemoveUntil(
+                context,
+                MaterialPageRoute(builder: (context) => const LoginScreen()),
+                (route) => false,
+              );
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.redAccent,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+            child: const Text("Logout"),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -49,25 +105,51 @@ class _DriverDashboardState extends State<DriverDashboard> {
     return Scaffold(
       backgroundColor: Colors.grey[50],
       appBar: AppBar(
-        title: const Text("Driver Portal", style: TextStyle(fontWeight: FontWeight.bold)),
+        toolbarHeight: 70,
+        backgroundColor: Colors.white,
+        elevation: 0,
+        title: Row(
+          children: [
+            CircleAvatar(
+              radius: 22,
+              backgroundColor: _getAvatarColor(_driverName),
+              child: Text(
+                _initial,
+                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    _getGreeting(),
+                    style: const TextStyle(fontSize: 12, color: Colors.grey, fontWeight: FontWeight.w500),
+                  ),
+                  Text(
+                    _driverName,
+                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.black87),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.logout, color: Colors.redAccent),
-            onPressed: () async {
-              await FirebaseAuth.instance.signOut();
-              if (context.mounted) {
-                Navigator.pushAndRemoveUntil(
-                  context,
-                  MaterialPageRoute(builder: (context) => const LoginScreen()),
-                  (route) => false,
-                );
-              }
-            },
+            icon: const Icon(Icons.notifications_none_outlined, color: Colors.black87),
+            onPressed: () {},
           ),
+          IconButton(
+            icon: const Icon(Icons.logout_rounded, color: Colors.redAccent),
+            onPressed: _showLogoutDialog,
+          ),
+          const SizedBox(width: 8),
         ],
       ),
       body: RefreshIndicator(
-        onRefresh: () async => _loadDriverStatus(),
+        onRefresh: () async => _loadDriverData(),
         child: SingleChildScrollView(
           physics: const AlwaysScrollableScrollPhysics(),
           padding: const EdgeInsets.all(16.0),
@@ -97,7 +179,6 @@ class _DriverDashboardState extends State<DriverDashboard> {
     );
   }
 
-  // --- STATS WIDGET (REALTME) ---
   Widget _buildLiveStats(Color primaryColor) {
     return StreamBuilder<QuerySnapshot>(
       stream: FirebaseFirestore.instance
@@ -107,8 +188,6 @@ class _DriverDashboardState extends State<DriverDashboard> {
           .snapshots(),
       builder: (context, snapshot) {
         int jobsDone = snapshot.hasData ? snapshot.data!.docs.length : 0;
-        
-        // Calculate earnings dynamically if a 'price' field exists in your bookings
         double totalEarnings = 0;
         if (snapshot.hasData) {
           for (var doc in snapshot.data!.docs) {
@@ -117,7 +196,6 @@ class _DriverDashboardState extends State<DriverDashboard> {
           }
         }
 
-        // Switching to a Row with Expanded children prevents GridView aspect ratio overflows
         return Row(
           children: [
             Expanded(
@@ -143,13 +221,12 @@ class _DriverDashboardState extends State<DriverDashboard> {
     );
   }
 
-  // --- ACTIVE SHIPMENT STREAM ---
   Widget _buildActiveShipmentStream(Color primaryColor) {
     return StreamBuilder<QuerySnapshot>(
       stream: FirebaseFirestore.instance
           .collection('bookings')
           .where('carrierId', isEqualTo: _currentUid)
-          .where('status', whereIn: ['accepted', 'out_for_delivery']) // Show both stages
+          .where('status', whereIn: ['accepted', 'out_for_delivery'])
           .limit(1)
           .snapshots(),
       builder: (context, snapshot) {
@@ -237,7 +314,6 @@ class _DriverDashboardState extends State<DriverDashboard> {
     );
   }
 
-  // --- UI COMPONENTS ---
 
   Widget _buildStatusCard(Color primaryColor) {
     return Card(
@@ -277,7 +353,7 @@ class _DriverDashboardState extends State<DriverDashboard> {
       ),
       child: Column(
         children: [
-          Icon(Icons.fact_check_outlined, size: 48, color: Colors.grey[300]), // Fixed Icon name
+          Icon(Icons.fact_check_outlined, size: 48, color: Colors.grey[300]),
           const SizedBox(height: 16),
           const Text("All Caught Up!", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
           const SizedBox(height: 4),
@@ -307,13 +383,7 @@ class _DriverDashboardState extends State<DriverDashboard> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
+        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, 4))],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -323,23 +393,9 @@ class _DriverDashboardState extends State<DriverDashboard> {
           const SizedBox(height: 12),
           FittedBox(
             fit: BoxFit.scaleDown,
-            child: Text(
-              value,
-              style: const TextStyle(
-                fontSize: 18, 
-                fontWeight: FontWeight.bold,
-                letterSpacing: -0.5,
-              ),
-            ),
+            child: Text(value, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, letterSpacing: -0.5)),
           ),
-          Text(
-            title,
-            style: TextStyle(
-              color: Colors.grey[600],
-              fontSize: 12,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
+          Text(title, style: TextStyle(color: Colors.grey[600], fontSize: 12, fontWeight: FontWeight.w500)),
         ],
       ),
     );
@@ -369,15 +425,9 @@ class _DriverDashboardState extends State<DriverDashboard> {
         return GestureDetector(
           onTap: () {
             if (action['label'] == 'History') {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => const DriverHistory()),
-              );
+              Navigator.push(context, MaterialPageRoute(builder: (context) => const DriverHistory()));
             } else if (action['label'] == 'Wallet') {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => const DriverWallet()),
-              );
+              Navigator.push(context, MaterialPageRoute(builder: (context) => const DriverWallet()));
             }
           },
           child: Column(
@@ -387,27 +437,12 @@ class _DriverDashboardState extends State<DriverDashboard> {
                 decoration: BoxDecoration(
                   color: Colors.white,
                   shape: BoxShape.circle,
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.05),
-                      blurRadius: 10,
-                    )
-                  ],
+                  boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10)],
                 ),
-                child: Icon(
-                  action['icon'] as IconData,
-                  color: primaryColor,
-                  size: 24,
-                ),
+                child: Icon(action['icon'] as IconData, color: primaryColor, size: 24),
               ),
               const SizedBox(height: 8),
-              Text(
-                action['label'] as String,
-                style: const TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
+              Text(action['label'] as String, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
             ],
           ),
         );

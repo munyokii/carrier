@@ -33,6 +33,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
     _fetchSystemStats();
   }
 
+  /// Fetches system totals dynamically from Firestore
   Future<void> _fetchSystemStats() async {
     try {
       final drivers = await FirebaseFirestore.instance.collection('drivers').count().get();
@@ -55,13 +56,50 @@ class _AdminDashboardState extends State<AdminDashboard> {
     }
   }
 
+  /// Handles logout with a professional confirmation modal
+  void _showLogoutDialog() {
+    showDialog(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text("Logout"),
+        content: const Text("Are you sure you want to sign out from the Admin panel?"),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text("Cancel", style: TextStyle(color: Colors.grey)),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              await FirebaseAuth.instance.signOut();
+              if (mounted) {
+                // Ensure we navigate using the root context and clear stack
+                Navigator.pushAndRemoveUntil(
+                  context,
+                  MaterialPageRoute(builder: (c) => const LoginScreen()),
+                  (route) => false,
+                );
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.redAccent,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+            child: const Text("Logout"),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final primaryColor = Theme.of(context).colorScheme.primary;
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8F9FA),
-      appBar: _buildAppBar(context, primaryColor),
+      appBar: _buildAppBar(primaryColor),
       body: RefreshIndicator(
         onRefresh: _fetchSystemStats,
         child: SingleChildScrollView(
@@ -76,7 +114,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
                   children: [
                     _buildWelcomeSection(),
                     const SizedBox(height: 25),
-                    _buildStatsGrid(primaryColor),
+                    _buildStatsGrid(),
                     const SizedBox(height: 30),
                     _buildSectionTitle("Management Actions"),
                     const SizedBox(height: 15),
@@ -105,6 +143,111 @@ class _AdminDashboardState extends State<AdminDashboard> {
     );
   }
 
+  // --- UI COMPONENTS ---
+
+  PreferredSizeWidget _buildAppBar(Color primaryColor) => AppBar(
+    title: const Text("Swiftline Admin", style: TextStyle(fontWeight: FontWeight.bold)),
+    backgroundColor: Colors.white,
+    elevation: 0.5,
+    actions: [
+      // Notification Icon with Badge
+      IconButton(
+        onPressed: () {},
+        icon: Stack(
+          children: [
+            const Icon(Icons.notifications_none_rounded, color: Colors.black87),
+            Positioned(
+              right: 2,
+              top: 2,
+              child: Container(
+                padding: const EdgeInsets.all(2),
+                decoration: const BoxDecoration(color: Colors.red, shape: BoxShape.circle),
+                constraints: const BoxConstraints(minWidth: 8, minHeight: 8),
+              ),
+            )
+          ],
+        ),
+      ),
+      // Logout Button triggers modal
+      IconButton(
+        onPressed: _showLogoutDialog, 
+        icon: const Icon(Icons.logout_rounded, color: Colors.redAccent)
+      ),
+      const SizedBox(width: 8),
+    ],
+  );
+
+  Widget _buildWelcomeSection() => Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Text("Hello, ${_user?.email?.split('@')[0]} 👋", style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+      const Text("Fleet operations directory", style: TextStyle(color: Colors.grey)),
+    ],
+  );
+
+  /// Fixed: Corrected method name call from _buildStatStatCard to _buildStatCard
+  Widget _buildStatsGrid() => Row(
+    children: [
+      _buildStatCard("Drivers", totalDrivers.toString(), Icons.person, Colors.blue),
+      const SizedBox(width: 12),
+      _buildStatCard("Stations", totalStations.toString(), Icons.hub, Colors.orange),
+      const SizedBox(width: 12),
+      _buildStatCard("Active", activeShipments.toString(), Icons.local_shipping, Colors.green),
+    ],
+  );
+
+  Widget _buildStatCard(String title, String value, IconData icon, Color color) => Expanded(
+    child: Container(
+      padding: const EdgeInsets.all(15),
+      decoration: BoxDecoration(
+        color: Colors.white, 
+        borderRadius: BorderRadius.circular(15), 
+        border: Border.all(color: Colors.grey.shade100)
+      ),
+      child: Column(
+        children: [
+          Icon(icon, color: color, size: 22),
+          const SizedBox(height: 8),
+          Text(value, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+          Text(title, style: const TextStyle(fontSize: 11, color: Colors.grey))
+        ]
+      ),
+    ),
+  );
+
+  Widget _buildAdminActions(BuildContext context, Color color) => GridView.count(
+    shrinkWrap: true, 
+    physics: const NeverScrollableScrollPhysics(), 
+    crossAxisCount: 2, 
+    crossAxisSpacing: 15, 
+    mainAxisSpacing: 15, 
+    childAspectRatio: 1.6,
+    children: [
+      _buildActionTile(context, "Add Station", Icons.add_business, color, () => Navigator.push(context, MaterialPageRoute(builder: (c) => const AddStation()))),
+      _buildActionTile(context, "Add Driver", Icons.person_add, Colors.indigo, () => Navigator.push(context, MaterialPageRoute(builder: (c) => const AddDriver()))),
+      _buildActionTile(context, "Bookings", Icons.inventory_2, Colors.teal, () => Navigator.push(context, MaterialPageRoute(builder: (c) => const AllBookings()))),
+      _buildActionTile(context, "Reports", Icons.analytics, Colors.purple, () {}),
+    ],
+  );
+
+  Widget _buildActionTile(BuildContext context, String title, IconData icon, Color color, VoidCallback onTap) => InkWell(
+    onTap: onTap, 
+    child: Container(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(15), 
+        border: Border.all(color: color.withOpacity(0.3))
+      ),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center, 
+        children: [
+          Icon(icon, color: color), 
+          const SizedBox(height: 5), 
+          Text(title, style: TextStyle(color: color, fontWeight: FontWeight.bold, fontSize: 13))
+        ]
+      )
+    ),
+  );
+
   Widget _buildStationCardsRow() {
     return StreamBuilder<QuerySnapshot>(
       stream: FirebaseFirestore.instance
@@ -125,9 +268,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
             itemBuilder: (context, index) {
               final doc = snapshot.data!.docs[index];
               final data = doc.data() as Map<String, dynamic>;
-              
               data['id'] = doc.id; 
-
               return _buildStationMapCard(data);
             },
           ),
@@ -225,16 +366,6 @@ class _AdminDashboardState extends State<AdminDashboard> {
     );
   }
 
-  Color _getAvatarColor(String name) {
-    final int hash = name.hashCode;
-    final List<Color> avatarColors = [
-      Colors.blue.shade400, Colors.indigo.shade400, Colors.teal.shade400,
-      Colors.pink.shade400, Colors.orange.shade400, Colors.purple.shade400,
-      Colors.cyan.shade400,
-    ];
-    return avatarColors[hash.abs() % avatarColors.length];
-  }
-
   Widget _buildRecentDriversList() {
     return StreamBuilder<QuerySnapshot>(
       stream: FirebaseFirestore.instance
@@ -281,6 +412,16 @@ class _AdminDashboardState extends State<AdminDashboard> {
     );
   }
 
+  Color _getAvatarColor(String name) {
+    final int hash = name.hashCode;
+    final List<Color> avatarColors = [
+      Colors.blue.shade400, Colors.indigo.shade400, Colors.teal.shade400,
+      Colors.pink.shade400, Colors.orange.shade400, Colors.purple.shade400,
+      Colors.cyan.shade400,
+    ];
+    return avatarColors[hash.abs() % avatarColors.length];
+  }
+
   Widget _buildSectionTitle(String title) => Text(title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold));
 
   Widget _buildListHeader(String title, VoidCallback onTap) => Padding(
@@ -294,58 +435,6 @@ class _AdminDashboardState extends State<AdminDashboard> {
     ),
   );
 
-  PreferredSizeWidget _buildAppBar(BuildContext context, Color primaryColor) => AppBar(
-    title: const Text("Swiftline Admin", style: TextStyle(fontWeight: FontWeight.bold)),
-    backgroundColor: Colors.white,
-    elevation: 0.5,
-    actions: [
-      IconButton(onPressed: () => _handleLogout(context), icon: const Icon(Icons.logout, color: Colors.red)),
-    ],
-  );
-
-  Widget _buildWelcomeSection() => Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      Text("Hello, ${_user?.email?.split('@')[0]} 👋", style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
-      const Text("Fleet operations directory"),
-    ],
-  );
-
-  Widget _buildStatsGrid(Color color) => Row(
-    children: [
-      _buildStatCard("Drivers", totalDrivers.toString(), Icons.person, Colors.blue),
-      const SizedBox(width: 12),
-      _buildStatCard("Stations", totalStations.toString(), Icons.hub, Colors.orange),
-      const SizedBox(width: 12),
-      _buildStatCard("Active", activeShipments.toString(), Icons.local_shipping, Colors.green),
-    ],
-  );
-
-  Widget _buildStatCard(String t, String v, IconData i, Color c) => Expanded(
-    child: Container(
-      padding: const EdgeInsets.all(15),
-      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(15), border: Border.all(color: Colors.grey.shade100)),
-      child: Column(children: [Icon(i, color: c, size: 22), const SizedBox(height: 8), Text(v, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)), Text(t, style: const TextStyle(fontSize: 11, color: Colors.grey))]),
-    ),
-  );
-
-  Widget _buildAdminActions(BuildContext context, Color color) => GridView.count(
-    shrinkWrap: true, physics: const NeverScrollableScrollPhysics(), crossAxisCount: 2, crossAxisSpacing: 15, mainAxisSpacing: 15, childAspectRatio: 1.6,
-    children: [
-      _buildActionTile(context, "Add Station", Icons.add_business, color, () => Navigator.push(context, MaterialPageRoute(builder: (c) => const AddStation()))),
-      _buildActionTile(context, "Add Driver", Icons.person_add, Colors.indigo, () => Navigator.push(context, MaterialPageRoute(builder: (c) => const AddDriver()))),
-      _buildActionTile(context, "Bookings", Icons.inventory_2, Colors.teal, () {
-        Navigator.push(context, MaterialPageRoute(builder: (c) => const AllBookings()));
-      }),
-      _buildActionTile(context, "Reports", Icons.analytics, Colors.purple, () {}),
-    ],
-  );
-
-  Widget _buildActionTile(BuildContext context, String t, IconData i, Color c, VoidCallback o) => InkWell(
-    onTap: o, child: Container(decoration: BoxDecoration(borderRadius: BorderRadius.circular(15), border: Border.all(color: c.withOpacity(0.3))),
-    child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [Icon(i, color: c), const SizedBox(height: 5), Text(t, style: TextStyle(color: c, fontWeight: FontWeight.bold, fontSize: 13))])),
-  );
-
   Widget _buildSmallStatusBadge(String status) {
     Color color = status == 'active' ? Colors.green : (status == 'rejected' ? Colors.red : Colors.orange);
     return Container(
@@ -356,9 +445,4 @@ class _AdminDashboardState extends State<AdminDashboard> {
   }
 
   Widget _buildEmptyState(String msg) => Center(child: Padding(padding: const EdgeInsets.all(20), child: Text(msg, style: const TextStyle(color: Colors.grey))));
-
-  Future<void> _handleLogout(BuildContext context) async {
-    await FirebaseAuth.instance.signOut();
-    if (context.mounted) Navigator.pushAndRemoveUntil(context, MaterialPageRoute(builder: (c) => const LoginScreen()), (r) => false);
-  }
 }

@@ -13,8 +13,29 @@ class BookingService {
     return "SWFT-$code"; 
   }
 
+  double _calculatePrice(double distanceKm, String vehicleType) {
+    double baseFare = 50.0; // Base start price in KES
+    double perKmRate = 30.0;
+
+    switch (vehicleType) {
+      case 'Motorbike':
+        perKmRate = 35.0;
+        break;
+      case 'Van':
+        perKmRate = 80.0;
+        baseFare = 200.0;
+        break;
+      case 'Truck':
+        perKmRate = 150.0;
+        baseFare = 500.0;
+        break;
+    }
+    return baseFare + (distanceKm * perKmRate);
+  }
+
   Future<void> createBooking({
     required String userId,
+    required String customerPhone, // ADDED THIS
     required String stationId,
     required String stationName,
     required String vehicleType,
@@ -30,11 +51,13 @@ class BookingService {
     try {
       final String newId = _bookingsRef.doc().id;
       final String trackingNumber = _generateTrackingNumber();
+      final double totalPrice = _calculatePrice(distance, vehicleType);
 
       BookingModel newBooking = BookingModel(
         id: newId,
         userId: userId,
         trackingNumber: trackingNumber,
+        customerPhone: customerPhone, // ADDED THIS
         stationId: stationId,
         stationName: stationName,
         carrierId: '',
@@ -49,11 +72,20 @@ class BookingService {
         pickupDateTime: pickupDate,
         weight: weight ?? 0.0,
         status: 'pending',
+        price: totalPrice,
         createdAt: DateTime.now(),
       );
 
+      // We use toMap() which now includes customerPhone
       await _bookingsRef.doc(newId).set(newBooking.toMap());
       
+      // Optional: Create initial status history log
+      await _bookingsRef.doc(newId).collection('status_history').add({
+        'status': 'pending',
+        'message': 'Booking created. Waiting for driver assignment.',
+        'timestamp': FieldValue.serverTimestamp(),
+      });
+
     } catch (e) {
       print("Error creating booking: $e");
       rethrow;

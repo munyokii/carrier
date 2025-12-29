@@ -318,10 +318,22 @@ class _BookingBottomSheetState extends State<_BookingBottomSheet> {
     }
   }
 
+  double _calculateBookingPrice(double distanceKm, String vehicleType) {
+    double baseFare = 50.0;
+    double perKmRate = 30.0;
+
+    switch (vehicleType) {
+      case 'Motorbike': perKmRate = 35.0; break;
+      case 'Van': perKmRate = 80.0; baseFare = 200.0; break;
+      case 'Truck': perKmRate = 150.0; baseFare = 500.0; break;
+    }
+    return baseFare + (distanceKm * perKmRate);
+  }
+
   void _submitBooking() async {
     if (_itemController.text.isEmpty || _addressController.text.isEmpty || _weightController.text.isEmpty) {
-       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Please fill all fields")));
-       return;
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Please fill all fields")));
+      return;
     }
 
     final user = FirebaseAuth.instance.currentUser;
@@ -329,7 +341,20 @@ class _BookingBottomSheetState extends State<_BookingBottomSheet> {
     setState(() => _isSubmitting = true);
 
     try {
+      // 1. Fetch the user's phone number from the 'users' collection
+      final userDoc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
+      
+      // Fallback to Auth phone number if Firestore doc doesn't exist/is empty
+      String userPhone = userDoc.data()?['phone'] ?? user.phoneNumber ?? "N/A";
+
+      if (userPhone == "N/A") {
+        throw Exception("Phone number not found. Please update your profile.");
+      }
+
       final String trackingId = _generateTrackingNumber();
+
+      final double distance = widget.stationData['distance'];
+      final double calculatedPrice = _calculateBookingPrice(distance, _selectedVehicle);
 
       final booking = BookingModel(
         id: '',
@@ -337,6 +362,7 @@ class _BookingBottomSheetState extends State<_BookingBottomSheet> {
         stationId: widget.stationData['id'],
         stationName: widget.stationData['stationName'],
         trackingNumber: trackingId,
+        customerPhone: userPhone,
         carrierId: '',
         carrierName: 'Searching...',
         vehicleType: _selectedVehicle,
@@ -349,6 +375,7 @@ class _BookingBottomSheetState extends State<_BookingBottomSheet> {
         distance: widget.stationData['distance'],
         pickupDateTime: DateTime.now().add(const Duration(hours: 1)),
         status: 'pending',
+        price: calculatedPrice,
         createdAt: DateTime.now(),
       );
 
@@ -362,7 +389,11 @@ class _BookingBottomSheetState extends State<_BookingBottomSheet> {
         _showSuccessDialog(trackingId); 
       }
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: $e"), backgroundColor: Colors.red));
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Error: ${e.toString()}"), backgroundColor: Colors.red)
+        );
+      }
     } finally {
       if (mounted) setState(() => _isSubmitting = false);
     }

@@ -4,7 +4,8 @@ import 'package:flutter/material.dart';
 class BookingModel {
   final String id;
   final String userId;
-  final String trackingNumber; // NEW FIELD
+  final String trackingNumber;
+  final String customerPhone;
   final String stationId;
   final String stationName;
   final String carrierId;
@@ -20,11 +21,13 @@ class BookingModel {
   final DateTime pickupDateTime;
   final String status;
   final DateTime createdAt;
+  final double price;
 
   BookingModel({
     required this.id,
     required this.userId,
-    required this.trackingNumber, // ADD TO CONSTRUCTOR
+    required this.trackingNumber,
+    required this.customerPhone,
     required this.stationId,
     required this.stationName,
     required this.carrierId,
@@ -40,6 +43,7 @@ class BookingModel {
     required this.pickupDateTime,
     required this.status,
     required this.createdAt,
+    required this.price,
   });
 
   // Convert Firestore Map to Model
@@ -47,7 +51,8 @@ class BookingModel {
     return BookingModel(
       id: docId,
       userId: json['userId'] ?? '',
-      trackingNumber: json['trackingNumber'] ?? 'N/A', // FETCH FROM DB
+      trackingNumber: json['trackingNumber'] ?? 'N/A',
+      customerPhone: json['customerPhone'] ?? '', // FETCH FROM DB
       stationId: json['stationId'] ?? '',
       stationName: json['stationName'] ?? '',
       carrierId: json['carrierId'] ?? '',
@@ -60,9 +65,14 @@ class BookingModel {
       deliveryAddress: json['deliveryAddress'] ?? '',
       deliveryLocation: json['deliveryLocation'] ?? const GeoPoint(0, 0),
       distance: (json['distance'] ?? 0).toDouble(),
-      pickupDateTime: (json['pickupDateTime'] as Timestamp).toDate(),
+      pickupDateTime: (json['pickupDateTime'] is Timestamp) 
+          ? (json['pickupDateTime'] as Timestamp).toDate() 
+          : DateTime.now(),
       status: json['status'] ?? 'pending',
-      createdAt: (json['createdAt'] as Timestamp).toDate(),
+      price: (json['price'] ?? 0.0).toDouble(),
+      createdAt: (json['createdAt'] is Timestamp) 
+          ? (json['createdAt'] as Timestamp).toDate() 
+          : DateTime.now(),
     );
   }
 
@@ -70,7 +80,8 @@ class BookingModel {
   Map<String, dynamic> toMap() {
     return {
       'userId': userId,
-      'trackingNumber': trackingNumber, // SAVE TO DB
+      'trackingNumber': trackingNumber,
+      'customerPhone': customerPhone, // SAVE TO DB
       'stationId': stationId,
       'stationName': stationName,
       'carrierId': carrierId,
@@ -85,16 +96,18 @@ class BookingModel {
       'distance': distance,
       'pickupDateTime': pickupDateTime,
       'status': status,
+      'price': price,
       'createdAt': createdAt,
     };
   }
 
-  // UI Helpers (Status Colors/Icons)
+  // --- UI HELPERS UPDATED FOR CARRIER LOGIC ---
+  
   Color get statusColor {
     switch (status) {
       case 'pending': return Colors.orange;
       case 'accepted': return Colors.green;
-      case 'in_transit': return Colors.blue;
+      case 'out_for_delivery': return Colors.blueAccent; // Added new status
       case 'delivered': return Colors.teal;
       case 'cancelled': return Colors.red;
       default: return Colors.grey;
@@ -105,12 +118,20 @@ class BookingModel {
     switch (status) {
       case 'pending': return 0;
       case 'accepted': return 1;
-      case 'in_transit': return 2;
+      case 'out_for_delivery': return 2; // Progress step 2
       case 'delivered': return 3;
       default: return 0;
     }
   }
 
   String get statusDisplayName => status.replaceAll('_', ' ').toUpperCase();
-  IconData get statusIcon => status == 'delivered' ? Icons.check_circle : Icons.local_shipping;
+  
+  IconData get statusIcon {
+    switch (status) {
+      case 'delivered': return Icons.verified;
+      case 'out_for_delivery': return Icons.directions_bike;
+      case 'cancelled': return Icons.cancel_outlined;
+      default: return Icons.local_shipping;
+    }
+  }
 }

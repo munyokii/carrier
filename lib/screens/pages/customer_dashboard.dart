@@ -20,7 +20,6 @@ class _CustomerDashboardState extends State<CustomerDashboard> {
   Map<String, dynamic>? _userData;
   final TextEditingController _searchController = TextEditingController();
 
-
   int _ongoingCount = 0;
   int _deliveredCount = 0;
   int _canceledCount = 0;
@@ -37,23 +36,17 @@ class _CustomerDashboardState extends State<CustomerDashboard> {
     super.dispose();
   }
 
-
   Future<void> _loadDashboardData() async {
     if (_user == null) return;
-
     try {
-
       final userDoc = await FirebaseFirestore.instance.collection('users').doc(_user.uid).get();
       
-
-
       final ongoingQuery = await FirebaseFirestore.instance
           .collection('bookings')
           .where('userId', isEqualTo: _user.uid)
-          .where('status', whereIn: ['pending', 'accepted', 'in_transit'])
+          .where('status', whereIn: ['pending', 'accepted', 'in_transit', 'out_for_delivery'])
           .count()
           .get();
-
 
       final deliveredQuery = await FirebaseFirestore.instance
           .collection('bookings')
@@ -61,7 +54,6 @@ class _CustomerDashboardState extends State<CustomerDashboard> {
           .where('status', isEqualTo: 'delivered')
           .count()
           .get();
-
 
       final canceledQuery = await FirebaseFirestore.instance
           .collection('bookings')
@@ -175,6 +167,12 @@ class _CustomerDashboardState extends State<CustomerDashboard> {
               Text(name, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
             ],
           ),
+        ),
+        IconButton(
+          onPressed: () {
+            // Logic for notifications
+          },
+          icon: const Icon(Icons.notifications_none_rounded, color: Colors.black87, size: 28),
         ),
         IconButton(
           onPressed: _handleLogout,
@@ -313,7 +311,7 @@ class _CustomerDashboardState extends State<CustomerDashboard> {
           stream: FirebaseFirestore.instance
               .collection('bookings')
               .where('userId', isEqualTo: _user?.uid)
-              .where('status', whereIn: ['pending', 'accepted', 'in_transit'])
+              .where('status', whereIn: ['pending', 'accepted', 'in_transit', 'out_for_delivery'])
               .orderBy('createdAt', descending: true) 
               .snapshots(),
           builder: (context, snapshot) {

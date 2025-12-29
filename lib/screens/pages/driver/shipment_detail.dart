@@ -14,8 +14,14 @@ class ShipmentDetail extends StatefulWidget {
 
 class _ShipmentDetailState extends State<ShipmentDetail> {
   bool _isUpdating = false;
+  final TextEditingController _manualEntryController = TextEditingController();
 
-  // 1. CALL CUSTOMER LOGIC - Fixed typo here
+  @override
+  void dispose() {
+    _manualEntryController.dispose();
+    super.dispose();
+  }
+
   Future<void> _makePhoneCall(String phoneNumber) async {
     final Uri launchUri = Uri(scheme: 'tel', path: phoneNumber);
     try {
@@ -29,7 +35,6 @@ class _ShipmentDetailState extends State<ShipmentDetail> {
     }
   }
 
-  // 2. DATABASE UPDATE LOGIC
   Future<void> _updateStatus(String newStatus, String logMessage) async {
     setState(() => _isUpdating = true);
     
@@ -48,7 +53,9 @@ class _ShipmentDetailState extends State<ShipmentDetail> {
       await batch.commit();
       if (mounted) {
         _showSnackBar("Shipment marked as ${newStatus.replaceAll('_', ' ')}", Colors.green);
-        if (newStatus == 'delivered') Navigator.pop(context);
+        if (newStatus == 'delivered') {
+          Navigator.of(context).popUntil((route) => route.isFirst);
+        }
       }
     } catch (e) {
       _showSnackBar("Update failed: $e", Colors.red);
@@ -57,21 +64,60 @@ class _ShipmentDetailState extends State<ShipmentDetail> {
     }
   }
 
-  // 3. QR SCANNER MODAL
+  void _showManualEntryDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text("Enter Tracking ID"),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text("Type the Tracking ID manually to verify delivery.", 
+              style: TextStyle(fontSize: 12, color: Colors.grey)),
+            const SizedBox(height: 15),
+            TextField(
+              controller: _manualEntryController,
+              textCapitalization: TextCapitalization.characters,
+              decoration: InputDecoration(
+                hintText: "e.g. SWFT-XXXXXX",
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                filled: true,
+                fillColor: Colors.grey[100],
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text("Cancel")),
+          ElevatedButton(
+            onPressed: () {
+              if (_manualEntryController.text.trim().toUpperCase() == widget.booking.trackingNumber) {
+                Navigator.pop(context);
+                Navigator.pop(context);
+                _updateStatus('delivered', "Delivery completed via manual Tracking ID verification.");
+              } else {
+                _showSnackBar("Invalid Tracking ID. Please try again.", Colors.red);
+              }
+            },
+            child: const Text("Verify"),
+          ),
+        ],
+      ),
+    );
+  }
+
   void _openScanner() {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(25))),
       builder: (context) => SizedBox(
-        height: MediaQuery.of(context).size.height * 0.8,
+        height: MediaQuery.of(context).size.height * 0.85,
         child: Column(
           children: [
             const SizedBox(height: 20),
-            const Text("Scan Package QR Code", 
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-            const Text("Verify the Tracking ID on the label", 
-              style: TextStyle(color: Colors.grey, fontSize: 13)),
+            const Text("Verify Delivery", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            const Text("Scan QR or use the ID below", style: TextStyle(color: Colors.grey, fontSize: 13)),
             const SizedBox(height: 20),
             Expanded(
               child: ClipRRect(
@@ -81,10 +127,8 @@ class _ShipmentDetailState extends State<ShipmentDetail> {
                     final List<Barcode> barcodes = capture.barcodes;
                     for (final barcode in barcodes) {
                       if (barcode.rawValue == widget.booking.trackingNumber) {
-                        Navigator.pop(context); // Close scanner
-                        _updateStatus('delivered', "Package verified via QR scan. Delivery completed.");
-                      } else {
-                        debugPrint("Wrong QR Code: ${barcode.rawValue}");
+                        Navigator.pop(context);
+                        _updateStatus('delivered', "Verified via QR scan.");
                       }
                     }
                   },
@@ -93,8 +137,18 @@ class _ShipmentDetailState extends State<ShipmentDetail> {
             ),
             Padding(
               padding: const EdgeInsets.all(24.0),
-              child: Text("Target: ${widget.booking.trackingNumber}", 
-                style: const TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1.2)),
+              child: Column(
+                children: [
+                  Text("Target ID: ${widget.booking.trackingNumber}", 
+                    style: const TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1.2)),
+                  const SizedBox(height: 15),
+                  TextButton.icon(
+                    onPressed: _showManualEntryDialog,
+                    icon: const Icon(Icons.edit_note),
+                    label: const Text("CAN'T SCAN? ENTER MANUALLY"),
+                  ),
+                ],
+              ),
             ),
           ],
         ),
@@ -117,7 +171,7 @@ class _ShipmentDetailState extends State<ShipmentDetail> {
     return Scaffold(
       backgroundColor: Colors.grey[50],
       appBar: AppBar(
-        title: const Text("Order Details", style: TextStyle(fontWeight: FontWeight.bold)),
+        title: const Text("Shipment Details", style: TextStyle(fontWeight: FontWeight.bold)),
         centerTitle: true,
       ),
       body: Column(
@@ -143,6 +197,7 @@ class _ShipmentDetailState extends State<ShipmentDetail> {
     );
   }
 
+
   Widget _buildStatusBanner(String status, ThemeData theme) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -155,7 +210,7 @@ class _ShipmentDetailState extends State<ShipmentDetail> {
           Icon(Icons.info_outline, color: theme.primaryColor, size: 20),
           const SizedBox(width: 12),
           Text(
-            "CURRENT STATUS: ${status.toUpperCase().replaceAll('_', ' ')}",
+            "STATUS: ${status.toUpperCase().replaceAll('_', ' ')}",
             style: TextStyle(color: theme.primaryColor, fontWeight: FontWeight.bold, fontSize: 12),
           ),
         ],
@@ -232,7 +287,7 @@ class _ShipmentDetailState extends State<ShipmentDetail> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(widget.booking.itemDescription, style: const TextStyle(fontWeight: FontWeight.bold)),
-                      Text("Tracking: ${widget.booking.trackingNumber}", style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                      Text("ID: ${widget.booking.trackingNumber}", style: const TextStyle(fontSize: 12, color: Colors.grey)),
                     ],
                   ),
                 ),
@@ -266,7 +321,7 @@ class _ShipmentDetailState extends State<ShipmentDetail> {
           : Icon(isOut ? Icons.qr_code_scanner : Icons.local_shipping),
         onPressed: _isUpdating ? null : () {
           if (status == 'accepted') {
-            _updateStatus('out_for_delivery', "Driver started the delivery journey.");
+            _updateStatus('out_for_delivery', "Driver started delivery.");
           } else if (isOut) {
             _openScanner();
           }
@@ -274,7 +329,7 @@ class _ShipmentDetailState extends State<ShipmentDetail> {
         label: _isUpdating 
           ? const CircularProgressIndicator(color: Colors.white)
           : Text(
-              isOut ? "SCAN QR TO COMPLETE" : "START DELIVERY",
+              isOut ? "VERIFY & COMPLETE" : "START DELIVERY",
               style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
             ),
       ),

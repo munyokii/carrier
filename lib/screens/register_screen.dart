@@ -20,6 +20,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
   final _fullNameController = TextEditingController();
+  final _phoneController = TextEditingController();
 
   bool _isLoading = false;
   bool _isPasswordObscured = true;
@@ -31,6 +32,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     _passwordController.dispose();
     _confirmPasswordController.dispose();
     _fullNameController.dispose();
+    _phoneController.dispose();
     super.dispose();
   }
 
@@ -57,9 +59,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
       if (userCredential.user != null) {
         String uid = userCredential.user!.uid;
+        
         await FirebaseFirestore.instance.collection("users").doc(uid).set({
           'fullName': _fullNameController.text.trim(),
           'email': _emailController.text.trim(),
+          'phone': _phoneController.text.trim(),
+          'role': 'customer',
           'createdAt': Timestamp.now(),
         });
 
@@ -83,11 +88,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
         case 'weak-password':
           errorMessage = 'The password is too weak. Please use at least 6 characters.';
           break;
-        case 'operation-not-allowed':
-          errorMessage = 'Email/Password registration is not enabled.';
-          break;
         default:
-          errorMessage = 'An unknown error occurred. Please try again.';
+          errorMessage = e.message ?? 'An unknown error occurred.';
       }
       _showError(errorMessage);
     } finally {
@@ -105,6 +107,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
         SnackBar(
           content: Text(message),
           backgroundColor: Colors.red,
+          behavior: SnackBarBehavior.floating,
         ),
       );
     }
@@ -151,87 +154,67 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     hintText: "Fullname",
                     icon: Icons.person_outline,
                     controller: _fullNameController,
-                    validator: (value) {
-                      if (value == null || value.trim().isEmpty) {
-                        return 'Please enter your full name';
-                      }
-                      return null;
-                    },
+                    validator: (value) => (value == null || value.isEmpty) ? 'Please enter your name' : null,
                   ),
                   const SizedBox(height: 20),
+
                   CustomTextField(
                     hintText: "Email",
                     icon: Icons.email_outlined,
                     controller: _emailController,
                     validator: (value) {
-                      if (value == null || value.trim().isEmpty) {
-                        return 'Please enter your email';
-                      }
-                      if (!RegExp(r'\S+@\S+\.\S+').hasMatch(value)) {
-                        return 'Please enter a valid email address';
+                      if (value == null || !RegExp(r'\S+@\S+\.\S+').hasMatch(value)) {
+                        return 'Please enter a valid email';
                       }
                       return null;
                     },
                   ),
                   const SizedBox(height: 20),
+
+                  // NEW: Phone Number Field
+                  CustomTextField(
+                    hintText: "Phone Number",
+                    icon: Icons.phone_outlined,
+                    controller: _phoneController,
+                    validator: (value) {
+                      if (value == null || value.trim().isEmpty) {
+                        return 'Please enter your phone number';
+                      }
+                      if (value.trim().length < 10) {
+                        return 'Please enter a valid phone number';
+                      }
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: 20),
+
                   CustomTextField(
                     hintText: "Password",
                     icon: Icons.lock_outline,
                     controller: _passwordController,
                     obscureText: _isPasswordObscured,
-                    validator: (value) {
-                      if (value == null || value.trim().isEmpty) {
-                        return 'Please enter a password';
-                      }
-                      if (value.length < 6) {
-                        return 'Password must be at least 6 characters';
-                      }
-                      return null;
-                    },
                     suffixIcon: IconButton(
-                      icon: Icon(
-                        _isPasswordObscured
-                            ? Icons.visibility_off
-                            : Icons.visibility,
-                      ),
-                      onPressed: () {
-                        setState(() {
-                          _isPasswordObscured = !_isPasswordObscured;
-                        });
-                      },
+                      icon: Icon(_isPasswordObscured ? Icons.visibility_off : Icons.visibility),
+                      onPressed: () => setState(() => _isPasswordObscured = !_isPasswordObscured),
                     ),
+                    validator: (value) => (value == null || value.length < 6) ? 'Min 6 characters required' : null,
                   ),
                   const SizedBox(height: 20),
+
                   CustomTextField(
                     hintText: "Confirm Password",
                     icon: Icons.lock_outline,
                     controller: _confirmPasswordController,
                     obscureText: _isConfirmPasswordObscured,
-                    validator: (value) {
-                      if (value == null || value.trim().isEmpty) {
-                        return 'Please confirm your password';
-                      }
-                      if (value != _passwordController.text) {
-                        return 'Passwords do not match';
-                      }
-                      return null;
-                    },
                     suffixIcon: IconButton(
-                      icon: Icon(
-                        _isConfirmPasswordObscured
-                            ? Icons.visibility_off
-                            : Icons.visibility,
-                      ),
-                      onPressed: () {
-                        setState(() {
-                          _isConfirmPasswordObscured =
-                              !_isConfirmPasswordObscured;
-                        });
-                      },
+                      icon: Icon(_isConfirmPasswordObscured ? Icons.visibility_off : Icons.visibility),
+                      onPressed: () => setState(() => _isConfirmPasswordObscured = !_isConfirmPasswordObscured),
                     ),
+                    validator: (value) => (value != _passwordController.text) ? 'Passwords do not match' : null,
                   ),
                   const SizedBox(height: 30),
                   
+                  // Register Button
                   SizedBox(
                     width: double.infinity,
                     height: 55,
@@ -240,18 +223,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       style: ElevatedButton.styleFrom(
                         backgroundColor: primaryColor,
                         foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(100),
-                        ),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(100)),
                       ),
                       child: _isLoading
-                          ? const CircularProgressIndicator(
-                              valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                            )
-                          : const Text(
-                              "Register",
-                              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                            ),
+                          ? const CircularProgressIndicator(color: Colors.white)
+                          : const Text("Register", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                     ),
                   ),
                   const SizedBox(height: 40),
@@ -270,14 +246,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   const Row(
                     mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                     children: [
-                      SocialLoginButton(
-                        icon: Icons.g_mobiledata,
-                        label: "Google",
-                      ),
-                      SocialLoginButton(
-                        icon: Icons.apple,
-                        label: "Apple",
-                      ),
+                      SocialLoginButton(icon: Icons.g_mobiledata, label: "Google"),
+                      SocialLoginButton(icon: Icons.apple, label: "Apple"),
                     ],
                   ),
                   const SizedBox(height: 40),
@@ -287,15 +257,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     children: [
                       const Text("Got an account? "),
                       GestureDetector(
-                        onTap: () {
-                          Navigator.pop(context);
-                        },
+                        onTap: () => Navigator.pop(context),
                         child: Text(
                           "Login",
-                          style: TextStyle(
-                            color: primaryColor,
-                            fontWeight: FontWeight.bold,
-                          ),
+                          style: TextStyle(color: primaryColor, fontWeight: FontWeight.bold),
                         ),
                       ),
                     ],

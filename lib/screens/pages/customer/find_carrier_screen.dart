@@ -331,6 +331,8 @@ class _BookingBottomSheetState extends State<_BookingBottomSheet> {
   }
 
   void _submitBooking() async {
+    if (_isSubmitting) return;
+
     if (_itemController.text.isEmpty || _addressController.text.isEmpty || _weightController.text.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Please fill all fields")));
       return;
@@ -338,21 +340,22 @@ class _BookingBottomSheetState extends State<_BookingBottomSheet> {
 
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
+
     setState(() => _isSubmitting = true);
 
     try {
-      // 1. Fetch the user's phone number from the 'users' collection
       final userDoc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
       
-      // Fallback to Auth phone number if Firestore doc doesn't exist/is empty
+      if (!mounted) return;
+
       String userPhone = userDoc.data()?['phone'] ?? user.phoneNumber ?? "N/A";
 
       if (userPhone == "N/A") {
+        setState(() => _isSubmitting = false);
         throw Exception("Phone number not found. Please update your profile.");
       }
 
       final String trackingId = _generateTrackingNumber();
-
       final double distance = widget.stationData['distance'];
       final double calculatedPrice = _calculateBookingPrice(distance, _selectedVehicle);
 
@@ -372,7 +375,7 @@ class _BookingBottomSheetState extends State<_BookingBottomSheet> {
         pickupLocation: widget.stationData['coordinates'],
         deliveryAddress: _addressController.text.trim(),
         deliveryLocation: const GeoPoint(0, 0), 
-        distance: widget.stationData['distance'],
+        distance: distance,
         pickupDateTime: DateTime.now().add(const Duration(hours: 1)),
         status: 'pending',
         price: calculatedPrice,
@@ -384,18 +387,18 @@ class _BookingBottomSheetState extends State<_BookingBottomSheet> {
 
       await FirebaseFirestore.instance.collection('bookings').add(bookingData);
 
-      if (mounted) {
-        Navigator.pop(context);
-        _showSuccessDialog(trackingId); 
-      }
+      if (!mounted) return;
+
+      Navigator.pop(context);
+      _showSuccessDialog(trackingId); 
+
     } catch (e) {
       if (mounted) {
+        setState(() => _isSubmitting = false);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text("Error: ${e.toString()}"), backgroundColor: Colors.red)
         );
       }
-    } finally {
-      if (mounted) setState(() => _isSubmitting = false);
     }
   }
 
@@ -509,7 +512,7 @@ class _BookingBottomSheetState extends State<_BookingBottomSheet> {
                 style: ElevatedButton.styleFrom(shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15))),
                 child: _isSubmitting 
                   ? const CircularProgressIndicator(color: Colors.white)
-                  : const Text("Confirm Booking", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                  : const Text("Booking...", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
               ),
             ),
           ],

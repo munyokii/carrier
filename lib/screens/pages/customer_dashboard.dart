@@ -5,6 +5,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:carrier/screens/pages/customer/find_carrier_screen.dart';
 import 'package:carrier/screens/pages/customer/booking_detail.dart';
 import 'package:carrier/screens/pages/customer/track_package.dart';
+import 'package:carrier/screens/pages/customer/booking_history.dart';
 import 'package:carrier/models/booking_model.dart';
 
 class CustomerDashboard extends StatefulWidget {
@@ -19,7 +20,7 @@ class _CustomerDashboardState extends State<CustomerDashboard> {
   Map<String, dynamic>? _userData;
   final TextEditingController _searchController = TextEditingController();
 
-  // Dynamic Stat Variables
+
   int _ongoingCount = 0;
   int _deliveredCount = 0;
   int _canceledCount = 0;
@@ -36,16 +37,16 @@ class _CustomerDashboardState extends State<CustomerDashboard> {
     super.dispose();
   }
 
-  /// Combined method to load user profile and aggregate booking stats
+
   Future<void> _loadDashboardData() async {
     if (_user == null) return;
 
     try {
-      // 1. Fetch User Data
+
       final userDoc = await FirebaseFirestore.instance.collection('users').doc(_user.uid).get();
       
-      // 2. Fetch Aggregated Counts (Ongoing, Delivered, Canceled)
-      // Ongoing: pending, accepted, or in_transit
+
+
       final ongoingQuery = await FirebaseFirestore.instance
           .collection('bookings')
           .where('userId', isEqualTo: _user.uid)
@@ -53,7 +54,7 @@ class _CustomerDashboardState extends State<CustomerDashboard> {
           .count()
           .get();
 
-      // Delivered: strictly delivered
+
       final deliveredQuery = await FirebaseFirestore.instance
           .collection('bookings')
           .where('userId', isEqualTo: _user.uid)
@@ -61,7 +62,7 @@ class _CustomerDashboardState extends State<CustomerDashboard> {
           .count()
           .get();
 
-      // Canceled: strictly cancelled
+
       final canceledQuery = await FirebaseFirestore.instance
           .collection('bookings')
           .where('userId', isEqualTo: _user.uid)
@@ -140,7 +141,7 @@ class _CustomerDashboardState extends State<CustomerDashboard> {
                 const SizedBox(height: 20),
                 _buildSearchBar(primaryColor),
                 const SizedBox(height: 25),
-                _buildStatsOverview(), // Now displays dynamic data
+                _buildStatsOverview(),
                 const SizedBox(height: 25),
                 _buildPromoBanner(primaryColor),
                 const SizedBox(height: 30),
@@ -279,7 +280,7 @@ class _CustomerDashboardState extends State<CustomerDashboard> {
       children: [
         _buildCircularAction(Icons.local_shipping, "Send", primaryColor, () => _navTo(const FindCarrierScreen())),
         _buildCircularAction(Icons.track_changes, "Track", Colors.blue, () => _navTo(const TrackPackageScreen())),
-        _buildCircularAction(Icons.inventory, "History", Colors.purple, () {}),
+        _buildCircularAction(Icons.inventory, "History", Colors.purple, () => _navTo(const BookingHistory())),
         _buildCircularAction(Icons.help_center, "Support", Colors.teal, () {}),
       ],
     );

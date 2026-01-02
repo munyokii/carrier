@@ -20,3 +20,14 @@ From this page admin can be able to see total number of all drivers registered t
 Admin can add stations, drivers, see all bookings and reports 
 
 ![Admin Dashboard](assets/images/docs/admin_dashboard.webp)
+
+### Driver Dashboard
+Drivers can set status if online or offline, view details of assigned packages, scan package or enter package code for pickup and vice versa after successful delivery.
+See total money earned based on deliveries done.
+
+![Driver Dashboard](assets/images/docs/driver_dashboard.webp)
+
+### Customer Dashboard
+Customer can book package delivery on active stations, track package, cancel delivery view package history and contact assigned drivers on package.
+
+![Customer Dashboard](assets/images/docs/customer_dashboard.webp)

@@ -11,7 +11,7 @@ class CarrierModel {
   final double rating;
   final int totalTrips;
   final bool isAvailable;
-  final double? capacity; // in tons
+  final double? capacity;
   final List<String>? services;
   final String? phoneNumber;
   final String? email;
@@ -37,14 +37,12 @@ class CarrierModel {
     this.lastUpdate,
   });
 
-  // Calculate distance from user location (in km)
   double calculateDistance(double userLat, double userLon) {
     return _calculateDistance(latitude, longitude, userLat, userLon);
   }
 
-  // Haversine formula to calculate distance between two points
   double _calculateDistance(double lat1, double lon1, double lat2, double lon2) {
-    const double earthRadius = 6371; // Earth's radius in kilometers
+    const double earthRadius = 6371;
 
     double dLat = _degreesToRadians(lat2 - lat1);
     double dLon = _degreesToRadians(lon2 - lon1);
@@ -64,7 +62,6 @@ class CarrierModel {
     return degrees * (math.pi / 180);
   }
 
-  // Create CarrierModel from Firestore document
   factory CarrierModel.fromFirestore(Map<String, dynamic> data, String id) {
     return CarrierModel(
       id: id,
@@ -85,7 +82,6 @@ class CarrierModel {
     );
   }
 
-  // Convert CarrierModel to Map for Firestore
   Map<String, dynamic> toFirestore() {
     return {
       'driverName': driverName,

@@ -46,13 +46,12 @@ class BookingModel {
     required this.price,
   });
 
-  // Convert Firestore Map to Model
   factory BookingModel.fromFirestore(Map<String, dynamic> json, String docId) {
     return BookingModel(
       id: docId,
       userId: json['userId'] ?? '',
       trackingNumber: json['trackingNumber'] ?? 'N/A',
-      customerPhone: json['customerPhone'] ?? '', // FETCH FROM DB
+      customerPhone: json['customerPhone'] ?? '',
       stationId: json['stationId'] ?? '',
       stationName: json['stationName'] ?? '',
       carrierId: json['carrierId'] ?? '',
@@ -76,12 +75,11 @@ class BookingModel {
     );
   }
 
-  // Convert Model to Map for Firestore
   Map<String, dynamic> toMap() {
     return {
       'userId': userId,
       'trackingNumber': trackingNumber,
-      'customerPhone': customerPhone, // SAVE TO DB
+      'customerPhone': customerPhone,
       'stationId': stationId,
       'stationName': stationName,
       'carrierId': carrierId,
@@ -101,13 +99,12 @@ class BookingModel {
     };
   }
 
-  // --- UI HELPERS UPDATED FOR CARRIER LOGIC ---
   
   Color get statusColor {
     switch (status) {
       case 'pending': return Colors.orange;
       case 'accepted': return Colors.green;
-      case 'out_for_delivery': return Colors.blueAccent; // Added new status
+      case 'out_for_delivery': return Colors.blueAccent;
       case 'delivered': return Colors.teal;
       case 'cancelled': return Colors.red;
       default: return Colors.grey;
@@ -118,7 +115,7 @@ class BookingModel {
     switch (status) {
       case 'pending': return 0;
       case 'accepted': return 1;
-      case 'out_for_delivery': return 2; // Progress step 2
+      case 'out_for_delivery': return 2;
       case 'delivered': return 3;
       default: return 0;
     }

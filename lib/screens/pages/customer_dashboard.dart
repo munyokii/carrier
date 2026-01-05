@@ -8,6 +8,7 @@ import 'package:carrier/screens/pages/customer/track_package.dart';
 import 'package:carrier/screens/pages/customer/booking_history.dart';
 import 'package:carrier/screens/pages/customer/notification_screen.dart';
 import 'package:carrier/models/booking_model.dart';
+import 'package:intl/intl.dart';
 
 class CustomerDashboard extends StatefulWidget {
   const CustomerDashboard({super.key});
@@ -122,29 +123,40 @@ class _CustomerDashboardState extends State<CustomerDashboard> {
     return Scaffold(
       backgroundColor: const Color(0xFFF8F9FD),
       body: SafeArea(
-        child: RefreshIndicator(
-          onRefresh: _loadDashboardData,
-          child: SingleChildScrollView(
-            physics: const AlwaysScrollableScrollPhysics(),
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _buildHeader(userName, primaryColor),
-                const SizedBox(height: 20),
-                _buildSearchBar(primaryColor),
-                const SizedBox(height: 25),
-                _buildStatsOverview(),
-                const SizedBox(height: 25),
-                _buildPromoBanner(primaryColor),
-                const SizedBox(height: 30),
-                _buildQuickActions(primaryColor),
-                const SizedBox(height: 30),
-                _buildActiveDeliveries(theme),
-                const SizedBox(height: 50),
-              ],
+        child: Column(
+          children: [
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
+              color: const Color(0xFFF8F9FD),
+              child: _buildHeader(userName, primaryColor),
             ),
-          ),
+
+            Expanded(
+              child: RefreshIndicator(
+                onRefresh: _loadDashboardData,
+                child: SingleChildScrollView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const SizedBox(height: 5), 
+                      _buildStatsOverview(),
+                      const SizedBox(height: 25),
+                      _buildPromoBanner(primaryColor),
+                      const SizedBox(height: 30),
+                      _buildQuickActions(primaryColor),
+                      const SizedBox(height: 30),
+                      _buildActiveDeliveries(theme),
+                      const SizedBox(height: 30),
+                      _buildRecentHistory(theme),
+                      const SizedBox(height: 50),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -216,30 +228,6 @@ class _CustomerDashboardState extends State<CustomerDashboard> {
           icon: const Icon(Icons.logout_rounded, color: Colors.redAccent),
         )
       ],
-    );
-  }
-
-  Widget _buildSearchBar(Color primary) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(15),
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 10, offset: const Offset(0, 4))],
-      ),
-      child: TextField(
-        controller: _searchController,
-        decoration: InputDecoration(
-          hintText: "Enter Tracking ID...",
-          prefixIcon: Icon(Icons.search, color: primary),
-          suffixIcon: Container(
-            margin: const EdgeInsets.all(8),
-            decoration: BoxDecoration(color: primary, borderRadius: BorderRadius.circular(10)),
-            child: const Icon(Icons.arrow_forward, color: Colors.white, size: 20),
-          ),
-          border: InputBorder.none,
-          contentPadding: const EdgeInsets.symmetric(vertical: 15),
-        ),
-      ),
     );
   }
 
@@ -374,6 +362,84 @@ class _CustomerDashboardState extends State<CustomerDashboard> {
                   return _buildDeliveryCard(booking, theme.colorScheme.primary);
                 },
               ),
+            );
+          },
+        ),
+      ],
+    );
+  }
+
+  Widget _buildHistoryItem(BookingModel booking) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(15),
+        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 5)],
+      ),
+      child: ListTile(
+        onTap: () => _navTo(BookingDetailsScreen(booking: booking)),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 15, vertical: 5),
+        leading: CircleAvatar(
+          backgroundColor: booking.statusColor.withOpacity(0.1),
+          child: Icon(booking.statusIcon, color: booking.statusColor, size: 20),
+        ),
+        title: Text(
+          booking.itemDescription,
+          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
+        subtitle: Text(
+          "${booking.statusDisplayName} • ${DateFormat('MMM dd, yyyy').format(booking.createdAt)}",
+          style: const TextStyle(fontSize: 11),
+        ),
+        trailing: const Icon(Icons.arrow_forward_ios, size: 12, color: Colors.grey),
+      ),
+    );
+  }
+
+  Widget _buildRecentHistory(ThemeData theme) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            const Text('Recent History', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            TextButton(
+              onPressed: () => _navTo(const BookingHistory()),
+              child: const Text("View All"),
+            ),
+          ],
+        ),
+        const SizedBox(height: 10),
+        StreamBuilder<QuerySnapshot>(
+          stream: FirebaseFirestore.instance
+              .collection('bookings')
+              .where('userId', isEqualTo: _user?.uid)
+              .where('status', whereIn: ['delivered', 'cancelled'])
+              .orderBy('createdAt', descending: true)
+              .limit(5)
+              .snapshots(),
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const Center(child: LinearProgressIndicator());
+            }
+            if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+              return _buildEmptyState("No history found", Icons.history);
+            }
+            return ListView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: snapshot.data!.docs.length,
+              itemBuilder: (context, index) {
+                final booking = BookingModel.fromFirestore(
+                  snapshot.data!.docs[index].data() as Map<String, dynamic>,
+                  snapshot.data!.docs[index].id,
+                );
+                return _buildHistoryItem(booking);
+              },
             );
           },
         ),

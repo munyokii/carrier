@@ -3,7 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:carrier/models/booking_model.dart';
 import 'package:intl/intl.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
-import 'package:firebase_auth/firebase_auth.dart'; // Required for security check
+import 'package:firebase_auth/firebase_auth.dart';
 
 class TrackPackageScreen extends StatefulWidget {
   const TrackPackageScreen({super.key});
@@ -14,8 +14,17 @@ class TrackPackageScreen extends StatefulWidget {
 
 class _TrackPackageScreenState extends State<TrackPackageScreen> {
   final TextEditingController _idController = TextEditingController();
-  final User? _currentUser = FirebaseAuth.instance.currentUser; // Current User
+  final User? _currentUser = FirebaseAuth.instance.currentUser;
   String? _searchId;
+  bool _showSuggestions = false;
+  final FocusNode _searchFocus = FocusNode();
+
+  @override
+  void dispose() {
+    _idController.dispose();
+    _searchFocus.dispose();
+    super.dispose();
+  }
 
   void _openScanner() {
     showModalBottomSheet(
@@ -35,6 +44,7 @@ class _TrackPackageScreenState extends State<TrackPackageScreen> {
                     setState(() {
                       _idController.text = code.toUpperCase();
                       _searchId = code.toUpperCase();
+                      _showSuggestions = false;
                     });
                     Navigator.pop(context);
                   }
@@ -43,8 +53,7 @@ class _TrackPackageScreenState extends State<TrackPackageScreen> {
             ),
             Center(
               child: Container(
-                width: 250,
-                height: 250,
+                width: 250, height: 250,
                 decoration: BoxDecoration(
                   border: Border.all(color: Colors.white, width: 2),
                   borderRadius: BorderRadius.circular(20),
@@ -52,22 +61,12 @@ class _TrackPackageScreenState extends State<TrackPackageScreen> {
               ),
             ),
             Positioned(
-              top: 20,
-              right: 20,
+              top: 20, right: 20,
               child: IconButton(
                 icon: const Icon(Icons.close, color: Colors.white, size: 30),
                 onPressed: () => Navigator.pop(context),
               ),
             ),
-            const Positioned(
-              bottom: 40,
-              left: 0,
-              right: 0,
-              child: Center(
-                child: Text("Align QR Code within the frame",
-                    style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-              ),
-            )
           ],
         ),
       ),
@@ -84,15 +83,23 @@ class _TrackPackageScreenState extends State<TrackPackageScreen> {
         foregroundColor: Colors.black,
         elevation: 0,
       ),
-      body: Column(
-        children: [
-          _buildSearchHeader(),
-          Expanded(
-            child: _searchId == null 
-              ? _buildWaitingState() 
-              : _buildTrackingTimeline(_searchId!),
-          ),
-        ],
+      body: GestureDetector(
+        onTap: () => setState(() => _showSuggestions = false),
+        child: Column(
+          children: [
+            _buildSearchHeader(),
+            Expanded(
+              child: Stack(
+                children: [
+                  _searchId == null 
+                      ? _buildWaitingState() 
+                      : _buildTrackingTimeline(_searchId!),
+                  if (_showSuggestions) _buildActiveBookingsOverlay(),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -114,6 +121,8 @@ class _TrackPackageScreenState extends State<TrackPackageScreen> {
               Expanded(
                 child: TextField(
                   controller: _idController,
+                  focusNode: _searchFocus,
+                  onTap: () => setState(() => _showSuggestions = true),
                   textCapitalization: TextCapitalization.characters,
                   decoration: InputDecoration(
                     hintText: "e.g. SWFT-ABC123",
@@ -134,6 +143,8 @@ class _TrackPackageScreenState extends State<TrackPackageScreen> {
                   if (_idController.text.isNotEmpty) {
                     setState(() {
                       _searchId = _idController.text.trim().toUpperCase();
+                      _showSuggestions = false;
+                      _searchFocus.unfocus();
                     });
                   }
                 },
@@ -153,13 +164,66 @@ class _TrackPackageScreenState extends State<TrackPackageScreen> {
     );
   }
 
+
+  Widget _buildActiveBookingsOverlay() {
+    return Container(
+      color: Colors.black.withOpacity(0.05),
+      child: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 20),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 10)],
+        ),
+        constraints: const BoxConstraints(maxHeight: 300),
+        child: StreamBuilder<QuerySnapshot>(
+          stream: FirebaseFirestore.instance
+              .collection('bookings')
+              .where('userId', isEqualTo: _currentUser?.uid)
+              .where('status', whereIn: ['pending', 'accepted', 'out_for_delivery'])
+              .snapshots(),
+          builder: (context, snapshot) {
+            if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+              return const Padding(
+                padding: EdgeInsets.all(20),
+                child: Text("No active bookings found.", style: TextStyle(color: Colors.grey)),
+              );
+            }
+
+            return ListView.separated(
+              shrinkWrap: true,
+              itemCount: snapshot.data!.docs.length,
+              separatorBuilder: (context, index) => const Divider(height: 1),
+              itemBuilder: (context, index) {
+                final doc = snapshot.data!.docs[index];
+                final data = doc.data() as Map<String, dynamic>;
+                return ListTile(
+                  leading: const Icon(Icons.local_shipping_outlined, color: Colors.blue),
+                  title: Text(data['trackingNumber'], style: const TextStyle(fontWeight: FontWeight.bold)),
+                  subtitle: Text(data['itemDescription'], maxLines: 1, overflow: TextOverflow.ellipsis),
+                  trailing: const Icon(Icons.arrow_forward_ios, size: 12),
+                  onTap: () {
+                    setState(() {
+                      _idController.text = data['trackingNumber'];
+                      _searchId = data['trackingNumber'];
+                      _showSuggestions = false;
+                    });
+                  },
+                );
+              },
+            );
+          },
+        ),
+      ),
+    );
+  }
+
   Widget _buildTrackingTimeline(String trackingNum) {
-    // SECURITY: Only fetch if the package belongs to the logged-in user
     return StreamBuilder<QuerySnapshot>(
       stream: FirebaseFirestore.instance
           .collection('bookings')
           .where('trackingNumber', isEqualTo: trackingNum)
-          .where('userId', isEqualTo: _currentUser?.uid) // SECURITY FILTER
+          .where('userId', isEqualTo: _currentUser?.uid)
           .limit(1)
           .snapshots(),
       builder: (context, snapshot) {
@@ -174,33 +238,53 @@ class _TrackPackageScreenState extends State<TrackPackageScreen> {
         final doc = snapshot.data!.docs.first;
         final booking = BookingModel.fromFirestore(doc.data() as Map<String, dynamic>, doc.id);
 
-        return ListView(
-          padding: const EdgeInsets.all(25),
-          children: [
-            _buildPackageSummary(booking),
-            const SizedBox(height: 30),
-            const Text("JOURNEY LOG", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey, fontSize: 12, letterSpacing: 1.2)),
-            const SizedBox(height: 20),
-            _buildTimelineStep("Ordered", "Package request received", booking.createdAt, true),
-            _buildTimelineStep("Accepted", "Driver ${booking.carrierName} assigned", null, booking.statusProgress >= 1),
-            _buildTimelineStep("In Transit", "Carrier is moving to destination", null, booking.statusProgress >= 2),
-            _buildTimelineStep("Delivered", "Package reached destination", null, booking.statusProgress >= 3),
-          ],
+        return StreamBuilder<QuerySnapshot>(
+          stream: doc.reference.collection('status_history').orderBy('timestamp', descending: false).snapshots(),
+          builder: (context, historySnapshot) {
+            Map<String, DateTime?> historyTimes = {};
+            if (historySnapshot.hasData) {
+              for (var hDoc in historySnapshot.data!.docs) {
+                final hData = hDoc.data() as Map<String, dynamic>;
+                historyTimes[hData['status']] = (hData['timestamp'] as Timestamp?)?.toDate();
+              }
+            }
+
+            return ListView(
+              padding: const EdgeInsets.all(25),
+              children: [
+                _buildPackageSummary(booking),
+                const SizedBox(height: 30),
+                const Text("JOURNEY LOG", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey, fontSize: 12, letterSpacing: 1.2)),
+                const SizedBox(height: 20),
+                _buildTimelineStep("Ordered", "Package request received", booking.createdAt, true),
+                _buildTimelineStep("Accepted", "Driver ${booking.carrierName} assigned", historyTimes['accepted'], booking.statusProgress >= 1),
+                _buildTimelineStep("In Transit", "Carrier is moving to destination", historyTimes['out_for_delivery'], booking.statusProgress >= 2),
+                _buildTimelineStep("Delivered", "Package reached destination", historyTimes['delivered'], booking.statusProgress >= 3),
+              ],
+            );
+          }
         );
       },
     );
   }
 
   Widget _buildTimelineStep(String title, String desc, DateTime? time, bool isDone) {
-    Color color = isDone ? Theme.of(context).primaryColor : Colors.grey[300]!;
+    Color color = isDone ? Colors.green : Colors.grey[300]!;
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Column(
           children: [
             Container(
-              width: 20, height: 20,
-              decoration: BoxDecoration(color: color, shape: BoxShape.circle, border: Border.all(color: Colors.white, width: 3)),
+              width: 24, height: 24,
+              decoration: BoxDecoration(
+                color: isDone ? Colors.green : Colors.white,
+                shape: BoxShape.circle,
+                border: Border.all(color: color, width: 2),
+              ),
+              child: isDone 
+                ? const Icon(Icons.check, color: Colors.white, size: 14) 
+                : Center(child: Container(width: 8, height: 8, decoration: BoxDecoration(color: Colors.grey[300], shape: BoxShape.circle))),
             ),
             Container(width: 2, height: 50, color: color.withOpacity(0.3)),
           ],
@@ -212,7 +296,8 @@ class _TrackPackageScreenState extends State<TrackPackageScreen> {
             children: [
               Text(title, style: TextStyle(fontWeight: FontWeight.bold, color: isDone ? Colors.black : Colors.grey)),
               Text(desc, style: TextStyle(fontSize: 12, color: Colors.grey[600])),
-              if (time != null) Text(DateFormat('hh:mm a').format(time), style: const TextStyle(fontSize: 10, color: Colors.blue)),
+              if (time != null) 
+                Text(DateFormat('MMM dd, hh:mm a').format(time), style: const TextStyle(fontSize: 10, color: Colors.blue, fontWeight: FontWeight.bold)),
               const SizedBox(height: 20),
             ],
           ),
@@ -250,9 +335,9 @@ class _TrackPackageScreenState extends State<TrackPackageScreen> {
           const Divider(height: 30),
           Row(
             children: [
-              const Icon(Icons.location_on, size: 14, color: Colors.redAccent),
+              Icon(Icons.location_on, size: 14, color: Theme.of(context).primaryColor),
               const SizedBox(width: 5),
-              Expanded(child: Text(booking.deliveryAddress, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12))),
+              Expanded(child: Text("Destination: ${booking.deliveryAddress}", overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12))),
             ],
           )
         ],
@@ -268,6 +353,7 @@ class _TrackPackageScreenState extends State<TrackPackageScreen> {
           Icon(Icons.location_searching, size: 60, color: Colors.grey[300]),
           const SizedBox(height: 15),
           const Text("Ready to track your package?", style: TextStyle(color: Colors.grey)),
+          const Text("Click the search bar to see your active bookings.", style: TextStyle(color: Colors.grey, fontSize: 11)),
         ],
       ),
     );
@@ -281,9 +367,10 @@ class _TrackPackageScreenState extends State<TrackPackageScreen> {
           const Icon(Icons.warning_amber_rounded, size: 60, color: Colors.redAccent),
           const SizedBox(height: 15),
           const Text("Tracking ID not found.", style: TextStyle(fontWeight: FontWeight.bold)),
-          const Text("You can only track packages linked to your account.", 
+          const Text("Ensure the ID is correct and linked to your account.", 
             textAlign: TextAlign.center, 
             style: TextStyle(color: Colors.grey, fontSize: 12)),
+          TextButton(onPressed: () => setState(() => _searchId = null), child: const Text("Try Again"))
         ],
       ),
     );

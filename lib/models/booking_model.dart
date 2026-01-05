@@ -6,6 +6,7 @@ class BookingModel {
   final String userId;
   final String trackingNumber;
   final String customerPhone;
+  final String recipientPhone;
   final String stationId;
   final String stationName;
   final String carrierId;
@@ -28,6 +29,7 @@ class BookingModel {
     required this.userId,
     required this.trackingNumber,
     required this.customerPhone,
+    required this.recipientPhone,
     required this.stationId,
     required this.stationName,
     required this.carrierId,
@@ -52,6 +54,7 @@ class BookingModel {
       userId: json['userId'] ?? '',
       trackingNumber: json['trackingNumber'] ?? 'N/A',
       customerPhone: json['customerPhone'] ?? '',
+      recipientPhone: json['recipientPhone'] ?? '',
       stationId: json['stationId'] ?? '',
       stationName: json['stationName'] ?? '',
       carrierId: json['carrierId'] ?? '',
@@ -80,6 +83,7 @@ class BookingModel {
       'userId': userId,
       'trackingNumber': trackingNumber,
       'customerPhone': customerPhone,
+      'recipientPhone': recipientPhone,
       'stationId': stationId,
       'stationName': stationName,
       'carrierId': carrierId,

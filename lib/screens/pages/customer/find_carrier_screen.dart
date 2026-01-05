@@ -282,7 +282,8 @@ class _BookingBottomSheet extends StatefulWidget {
 class _BookingBottomSheetState extends State<_BookingBottomSheet> {
   final _itemController = TextEditingController();
   final _addressController = TextEditingController();
-  final _weightController = TextEditingController(); 
+  final _weightController = TextEditingController();
+  final _recipientPhoneController = TextEditingController();
   
   List<dynamic> _placePredictions = [];
   final String _googleMapsApiKey = "YOUR_GOOGLE_PLACES_API_KEY"; 
@@ -333,7 +334,7 @@ class _BookingBottomSheetState extends State<_BookingBottomSheet> {
   void _submitBooking() async {
     if (_isSubmitting) return;
 
-    if (_itemController.text.isEmpty || _addressController.text.isEmpty || _weightController.text.isEmpty) {
+    if (_itemController.text.isEmpty || _addressController.text.isEmpty || _weightController.text.isEmpty || _recipientPhoneController.text.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Please fill all fields")));
       return;
     }
@@ -366,6 +367,7 @@ class _BookingBottomSheetState extends State<_BookingBottomSheet> {
         stationName: widget.stationData['stationName'],
         trackingNumber: trackingId,
         customerPhone: userPhone,
+        recipientPhone: _recipientPhoneController.text.trim(),
         carrierId: '',
         carrierName: 'Searching...',
         vehicleType: _selectedVehicle,
@@ -454,6 +456,9 @@ class _BookingBottomSheetState extends State<_BookingBottomSheet> {
             Text("Book to ${widget.stationData['stationName']}", style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
             const SizedBox(height: 20),
             _buildInput("Item Description", _itemController, Icons.inventory_2_outlined),
+            const SizedBox(height: 15),
+
+            _buildInput("Recipient Phone Number", _recipientPhoneController, Icons.phone_android_outlined),
             const SizedBox(height: 15),
             
             TextField(

@@ -35,7 +35,8 @@ class BookingService {
 
   Future<void> createBooking({
     required String userId,
-    required String customerPhone, // ADDED THIS
+    required String customerPhone,
+    required String recipientPhone,
     required String stationId,
     required String stationName,
     required String vehicleType,
@@ -57,7 +58,8 @@ class BookingService {
         id: newId,
         userId: userId,
         trackingNumber: trackingNumber,
-        customerPhone: customerPhone, // ADDED THIS
+        customerPhone: customerPhone,
+        recipientPhone: recipientPhone,
         stationId: stationId,
         stationName: stationName,
         carrierId: '',

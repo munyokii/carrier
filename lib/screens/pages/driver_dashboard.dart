@@ -227,7 +227,7 @@ class _DriverDashboardState extends State<DriverDashboard> {
           .collection('bookings')
           .where('carrierId', isEqualTo: _currentUid)
           .where('status', whereIn: ['accepted', 'out_for_delivery'])
-          .limit(1)
+          .orderBy('createdAt', descending: true)
           .snapshots(),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
@@ -238,10 +238,23 @@ class _DriverDashboardState extends State<DriverDashboard> {
           return _buildEmptyState();
         }
 
-        final bookingData = snapshot.data!.docs.first.data() as Map<String, dynamic>;
-        final booking = BookingModel.fromFirestore(bookingData, snapshot.data!.docs.first.id);
-
-        return _buildShipmentCard(booking, primaryColor);
+        return SizedBox(
+          height: 210,
+          child: ListView.builder(
+            scrollDirection: Axis.horizontal,
+            itemCount: snapshot.data!.docs.length,
+            itemBuilder: (context, index) {
+              final bookingData = snapshot.data!.docs[index].data() as Map<String, dynamic>;
+              final booking = BookingModel.fromFirestore(bookingData, snapshot.data!.docs[index].id);
+              
+              return Container(
+                width: MediaQuery.of(context).size.width * 0.85,
+                margin: const EdgeInsets.only(right: 12),
+                child: _buildShipmentCard(booking, primaryColor),
+              );
+            },
+          ),
+        );
       },
     );
   }
@@ -255,44 +268,49 @@ class _DriverDashboardState extends State<DriverDashboard> {
       ),
       child: Padding(
         padding: const EdgeInsets.all(16),
-        child: Column(
-          children: [
-            Row(
-              children: [
-                CircleAvatar(
-                  backgroundColor: primaryColor.withOpacity(0.1),
-                  child: Icon(booking.statusIcon, color: primaryColor),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Text(booking.trackingNumber, style: const TextStyle(fontWeight: FontWeight.bold)),
-                          const SizedBox(width: 8),
-                          _buildStatusBadge(booking),
-                        ],
-                      ),
-                      Text("${booking.itemDescription} • ${booking.weight}kg", 
-                        style: const TextStyle(fontSize: 12, color: Colors.grey)),
-                    ],
+        // Use SingleChildScrollView to catch minor layout variations
+        child: SingleChildScrollView( 
+          physics: const NeverScrollableScrollPhysics(), 
+          child: Column(
+            mainAxisSize: MainAxisSize.min, // Ensure it only takes needed space
+            children: [
+              Row(
+                children: [
+                  CircleAvatar(
+                    backgroundColor: primaryColor.withOpacity(0.1),
+                    child: Icon(booking.statusIcon, color: primaryColor),
                   ),
-                ),
-                const Icon(Icons.arrow_forward_ios, size: 14, color: Colors.grey),
-              ],
-            ),
-            const Divider(height: 32),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                _locationPoint("PICKUP", booking.stationName),
-                Icon(Icons.multiple_stop, size: 20, color: primaryColor.withOpacity(0.3)),
-                _locationPoint("DESTINATION", booking.deliveryAddress.split(',').first),
-              ],
-            ),
-            const SizedBox(height: 20),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Text(booking.trackingNumber, style: const TextStyle(fontWeight: FontWeight.bold)),
+                            const SizedBox(width: 8),
+                            _buildStatusBadge(booking),
+                          ],
+                        ),
+                        Text("${booking.itemDescription} • ${booking.weight}kg", 
+                          style: const TextStyle(fontSize: 12, color: Colors.grey),
+                          maxLines: 1, // Restrict text to 1 line
+                          overflow: TextOverflow.ellipsis),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const Divider(height: 24), // Reduced height of divider
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  _locationPoint("PICKUP", booking.stationName),
+                  Icon(Icons.multiple_stop, size: 20, color: primaryColor.withOpacity(0.3)),
+                  _locationPoint("DESTINATION", booking.deliveryAddress.split(',').first),
+                ],
+              ),
+            const SizedBox(height: 12),
             ElevatedButton(
               style: ElevatedButton.styleFrom(
                 minimumSize: const Size(double.infinity, 50),
@@ -311,7 +329,7 @@ class _DriverDashboardState extends State<DriverDashboard> {
           ],
         ),
       ),
-    );
+    ));
   }
 
 

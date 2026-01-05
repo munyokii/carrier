@@ -121,6 +121,11 @@ class _AdminDashboardState extends State<AdminDashboard> {
                 ),
               ),
 
+              _buildListHeader("Recent Bookings", () {
+                Navigator.push(context, MaterialPageRoute(builder: (c) => const AllBookings()));
+              }),
+              _buildRecentBookingsRow(),
+
               _buildListHeader("Stations", () {
                 Navigator.push(context, MaterialPageRoute(builder: (c) => const AllStations()));
               }),
@@ -265,6 +270,111 @@ class _AdminDashboardState extends State<AdminDashboard> {
       )
     ),
   );
+
+  Widget _buildRecentBookingsRow() {
+    return StreamBuilder<QuerySnapshot>(
+      stream: FirebaseFirestore.instance
+          .collection('bookings')
+          .orderBy('createdAt', descending: true)
+          .limit(5)
+          .snapshots(),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) return const Center(child: LinearProgressIndicator());
+        if (snapshot.data!.docs.isEmpty) return _buildEmptyState("No recent bookings found.");
+
+        return SizedBox(
+          height: 160,
+          child: ListView.builder(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            itemCount: snapshot.data!.docs.length,
+            itemBuilder: (context, index) {
+              final doc = snapshot.data!.docs[index];
+              final data = doc.data() as Map<String, dynamic>;
+              return _buildBookingCard(data, doc.id);
+            },
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildBookingCard(Map<String, dynamic> data, String id) {
+    Color statusColor;
+    String status = data['status'] ?? 'pending';
+    switch (status) {
+      case 'delivered': statusColor = Colors.blue; break;
+      case 'cancelled': statusColor = Colors.red; break;
+      case 'out_for_delivery': statusColor = Colors.purple; break;
+      default: statusColor = Colors.green;
+    }
+
+    return Container(
+      width: 220,
+      margin: const EdgeInsets.only(right: 15, bottom: 10, top: 5),
+      padding: const EdgeInsets.all(15),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 8,
+            offset: const Offset(0, 4),
+          )
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: statusColor.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  status.toUpperCase(),
+                  style: TextStyle(color: statusColor, fontSize: 9, fontWeight: FontWeight.bold),
+                ),
+              ),
+              const Icon(Icons.inventory_2_outlined, size: 16, color: Colors.grey),
+            ],
+          ),
+          const Spacer(),
+          Text(
+            data['itemDescription'] ?? 'No Description',
+            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+          const SizedBox(height: 4),
+          Text(
+            "Tracking: ${data['trackingNumber'] ?? 'N/A'}",
+            style: TextStyle(color: Colors.grey[600], fontSize: 11),
+          ),
+          const Divider(height: 15),
+          Row(
+            children: [
+              const Icon(Icons.location_on_outlined, size: 12, color: Colors.grey),
+              const SizedBox(width: 4),
+              Expanded(
+                child: Text(
+                  data['deliveryAddress'] ?? 'No Address',
+                  style: const TextStyle(fontSize: 10, color: Colors.black87),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
 
   Widget _buildStationCardsRow() {
     return StreamBuilder<QuerySnapshot>(

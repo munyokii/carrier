@@ -240,28 +240,20 @@ class _BookDeliveryScreenState extends State<BookDeliveryScreen> {
 
     try {
       final user = FirebaseAuth.instance.currentUser;
-      if (user == null) {
-        throw Exception('User not logged in');
-      }
+      if (user == null) throw Exception('User not logged in');
 
       DateTime pickupDateTime = DateTime(
-        _pickupDate!.year,
-        _pickupDate!.month,
-        _pickupDate!.day,
-        _pickupTime!.hour,
-        _pickupTime!.minute,
+        _pickupDate!.year, _pickupDate!.month, _pickupDate!.day,
+        _pickupTime!.hour, _pickupTime!.minute,
       );
 
-      // Calculate distance between pickup and delivery
       double distance = Geolocator.distanceBetween(
-        _pickupLocation!.latitude,
-        _pickupLocation!.longitude,
-        _deliveryLocation!.latitude,
-        _deliveryLocation!.longitude,
-      ) / 1000; // Convert to km
+        _pickupLocation!.latitude, _pickupLocation!.longitude,
+        _deliveryLocation!.latitude, _deliveryLocation!.longitude,
+      ) / 1000;
 
-      // Create booking document
-      await FirebaseFirestore.instance.collection('bookings').add({
+      // 1. Create the main booking document and get the reference
+      DocumentReference bookingRef = await FirebaseFirestore.instance.collection('bookings').add({
         'userId': user.uid,
         'carrierId': widget.carrier.id,
         'carrierName': widget.carrier.driverName,
@@ -281,6 +273,17 @@ class _BookDeliveryScreenState extends State<BookDeliveryScreen> {
         'status': 'pending',
         'createdAt': FieldValue.serverTimestamp(),
         'updatedAt': FieldValue.serverTimestamp(),
+      });
+
+      // 2. Add the initial status history (This triggers the Notification Badges)
+      await bookingRef.collection('status_history').add({
+        'status': 'pending',
+        'message': 'New booking request for ${widget.carrier.driverName}',
+        'timestamp': FieldValue.serverTimestamp(),
+        'userId': user.uid,
+        'bookingId': bookingRef.id,
+        'read': false,        // For the Customer badge
+        'readByAdmin': false, // For the Admin badge
       });
 
       if (mounted) {

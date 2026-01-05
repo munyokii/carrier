@@ -13,6 +13,7 @@ import 'package:carrier/screens/pages/admin/all_stations.dart';
 import 'package:carrier/screens/pages/admin/station_detail.dart';
 import 'package:carrier/screens/pages/admin/all_bookings.dart';
 import 'package:carrier/screens/pages/admin/admin_reports.dart';
+import 'package:carrier/screens/pages/admin/admin_notification.dart';
 
 class AdminDashboard extends StatefulWidget {
   const AdminDashboard({super.key});
@@ -33,7 +34,6 @@ class _AdminDashboardState extends State<AdminDashboard> {
     _fetchSystemStats();
   }
 
-  /// Fetches system totals dynamically from Firestore
   Future<void> _fetchSystemStats() async {
     try {
       final drivers = await FirebaseFirestore.instance.collection('drivers').count().get();
@@ -56,7 +56,6 @@ class _AdminDashboardState extends State<AdminDashboard> {
     }
   }
 
-  /// Handles logout with a professional confirmation modal
   void _showLogoutDialog() {
     showDialog(
       context: context,
@@ -73,7 +72,6 @@ class _AdminDashboardState extends State<AdminDashboard> {
             onPressed: () async {
               await FirebaseAuth.instance.signOut();
               if (mounted) {
-                // Ensure we navigate using the root context and clear stack
                 Navigator.pushAndRemoveUntil(
                   context,
                   MaterialPageRoute(builder: (c) => const LoginScreen()),
@@ -143,32 +141,53 @@ class _AdminDashboardState extends State<AdminDashboard> {
     );
   }
 
-  // --- UI COMPONENTS ---
 
   PreferredSizeWidget _buildAppBar(Color primaryColor) => AppBar(
     title: const Text("Swiftline Admin", style: TextStyle(fontWeight: FontWeight.bold)),
     backgroundColor: Colors.white,
     elevation: 0.5,
     actions: [
-      // Notification Icon with Badge
-      IconButton(
-        onPressed: () {},
-        icon: Stack(
-          children: [
-            const Icon(Icons.notifications_none_rounded, color: Colors.black87),
-            Positioned(
-              right: 2,
-              top: 2,
-              child: Container(
-                padding: const EdgeInsets.all(2),
-                decoration: const BoxDecoration(color: Colors.red, shape: BoxShape.circle),
-                constraints: const BoxConstraints(minWidth: 8, minHeight: 8),
-              ),
-            )
-          ],
-        ),
+      StreamBuilder<QuerySnapshot>(
+        stream: FirebaseFirestore.instance
+            .collectionGroup('status_history')
+            .where('readByAdmin', isEqualTo: false)
+            .snapshots(),
+        builder: (context, snapshot) {
+          int unreadCount = snapshot.hasData ? snapshot.data!.docs.length : 0;
+
+          return IconButton(
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const AdminNotifications()),
+              );
+            },
+            icon: Stack(
+              children: [
+                const Icon(Icons.notifications_none_rounded, color: Colors.black87, size: 28),
+                if (unreadCount > 0)
+                  Positioned(
+                    right: 0,
+                    top: 0,
+                    child: Container(
+                      padding: const EdgeInsets.all(4),
+                      decoration: const BoxDecoration(
+                        color: Colors.red,
+                        shape: BoxShape.circle,
+                      ),
+                      constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
+                      child: Text(
+                        unreadCount > 9 ? '9+' : '$unreadCount',
+                        style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          );
+        },
       ),
-      // Logout Button triggers modal
       IconButton(
         onPressed: _showLogoutDialog, 
         icon: const Icon(Icons.logout_rounded, color: Colors.redAccent)
@@ -185,7 +204,6 @@ class _AdminDashboardState extends State<AdminDashboard> {
     ],
   );
 
-  /// Fixed: Corrected method name call from _buildStatStatCard to _buildStatCard
   Widget _buildStatsGrid() => Row(
     children: [
       _buildStatCard("Drivers", totalDrivers.toString(), Icons.person, Colors.blue),

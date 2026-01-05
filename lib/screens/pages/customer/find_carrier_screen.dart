@@ -385,7 +385,19 @@ class _BookingBottomSheetState extends State<_BookingBottomSheet> {
       var bookingData = booking.toMap();
       bookingData['createdAt'] = FieldValue.serverTimestamp();
 
-      await FirebaseFirestore.instance.collection('bookings').add(bookingData);
+      DocumentReference bookingRef = await FirebaseFirestore.instance
+          .collection('bookings')
+          .add(bookingData);
+
+      await bookingRef.collection('status_history').add({
+        'status': 'pending',
+        'message': 'New booking: ${_itemController.text.trim()} to ${widget.stationData['stationName']}',
+        'timestamp': FieldValue.serverTimestamp(),
+        'userId': user.uid,
+        'bookingId': bookingRef.id,
+        'read': false,
+        'readByAdmin': false,
+      });
 
       if (!mounted) return;
 

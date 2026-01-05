@@ -42,14 +42,19 @@ class _ShipmentDetailState extends State<ShipmentDetail> {
     final bookingRef = FirebaseFirestore.instance.collection('bookings').doc(widget.booking.id);
     final historyRef = bookingRef.collection('status_history').doc();
 
-    batch.update(bookingRef, {'status': newStatus});
+    batch.update(bookingRef, {
+      'status': newStatus,
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
 
     batch.set(historyRef, {
       'status': newStatus,
       'message': logMessage,
       'timestamp': FieldValue.serverTimestamp(),
       'userId': widget.booking.userId,
+      'bookingId': widget.booking.id,
       'read': false,
+      'readByAdmin': false,
     });
 
     try {
@@ -324,7 +329,7 @@ class _ShipmentDetailState extends State<ShipmentDetail> {
           : Icon(isOut ? Icons.qr_code_scanner : Icons.local_shipping),
         onPressed: _isUpdating ? null : () {
           if (status == 'accepted') {
-            _updateStatus('out_for_delivery', "Your driver ${widget.booking.carrierName} is on the way to pick up the package.");
+            _updateStatus('out_for_delivery', "Driver ${widget.booking.carrierName} started delivery for ${widget.booking.trackingNumber}");
           } else if (isOut) {
             _openScanner(); 
           }

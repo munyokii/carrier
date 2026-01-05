@@ -14,6 +14,7 @@ class ShipmentDetail extends StatefulWidget {
 
 class _ShipmentDetailState extends State<ShipmentDetail> {
   bool _isUpdating = false;
+  String _scannerError = "";
   final TextEditingController _manualEntryController = TextEditingController();
 
   @override
@@ -73,19 +74,24 @@ class _ShipmentDetailState extends State<ShipmentDetail> {
   }
 
   void _showManualEntryDialog() {
+    _manualEntryController.text = widget.booking.trackingNumber;
+
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text("Enter Tracking ID"),
+        title: const Text("Verify Tracking ID"),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Text("Type the Tracking ID manually to verify delivery.", 
-              style: TextStyle(fontSize: 12, color: Colors.grey)),
+            const Text(
+              "The Tracking ID has been pre-filled for your convenience.", 
+              style: TextStyle(fontSize: 12, color: Colors.grey)
+            ),
             const SizedBox(height: 15),
             TextField(
               controller: _manualEntryController,
               textCapitalization: TextCapitalization.characters,
+              readOnly: true,
               decoration: InputDecoration(
                 hintText: "e.g. SWFT-XXXXXX",
                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
@@ -96,18 +102,21 @@ class _ShipmentDetailState extends State<ShipmentDetail> {
           ],
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text("Cancel")),
+          TextButton(
+            onPressed: () => Navigator.pop(context), 
+            child: const Text("Cancel")
+          ),
           ElevatedButton(
             onPressed: () {
               if (_manualEntryController.text.trim().toUpperCase() == widget.booking.trackingNumber) {
                 Navigator.pop(context);
                 Navigator.pop(context);
-                _updateStatus('delivered', "Delivery completed via manual Tracking ID verification.");
+                _updateStatus('delivered', "Delivery completed via automated ID verification.");
               } else {
                 _showSnackBar("Invalid Tracking ID. Please try again.", Colors.red);
               }
             },
-            child: const Text("Verify"),
+            child: const Text("Verify & Complete"),
           ),
         ],
       ),
@@ -115,34 +124,59 @@ class _ShipmentDetailState extends State<ShipmentDetail> {
   }
 
   void _openScanner() {
+    setState(() => _scannerError = "");
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(25))),
-      builder: (context) => SizedBox(
-        height: MediaQuery.of(context).size.height * 0.85,
-        child: Column(
-          children: [
-            const SizedBox(height: 20),
-            const Text("Verify Delivery", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-            const Text("Scan QR or use the ID below", style: TextStyle(color: Colors.grey, fontSize: 13)),
-            const SizedBox(height: 20),
-            Expanded(
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(20),
-                child: MobileScanner(
-                  onDetect: (capture) {
-                    final List<Barcode> barcodes = capture.barcodes;
-                    for (final barcode in barcodes) {
-                      if (barcode.rawValue == widget.booking.trackingNumber) {
-                        Navigator.pop(context);
-                        _updateStatus('delivered', "Verified via QR scan.");
+      builder: (context) => StatefulBuilder(
+        builder: (context, setModalState) => SizedBox(
+          height: MediaQuery.of(context).size.height * 0.85,
+          child: Column(
+            children: [
+              const SizedBox(height: 20),
+              const Text("Verify Delivery", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+              
+              if (_scannerError.isNotEmpty)
+                Container(
+                  margin: const EdgeInsets.all(10),
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  decoration: BoxDecoration(color: Colors.red.shade100, borderRadius: BorderRadius.circular(8)),
+                  child: Text(_scannerError, style: TextStyle(color: Colors.red.shade900, fontWeight: FontWeight.bold, fontSize: 12)),
+                )
+              else
+                const Text("Scan QR or use the ID below", style: TextStyle(color: Colors.grey, fontSize: 13)),
+              
+              const SizedBox(height: 20),
+              Expanded(
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(20),
+                  child: MobileScanner(
+                    onDetect: (capture) {
+                      final List<Barcode> barcodes = capture.barcodes;
+                      for (final barcode in barcodes) {
+                        final String? rawValue = barcode.rawValue;
+
+                        if (rawValue != null) {
+                          if (rawValue.trim().toUpperCase() == widget.booking.trackingNumber.trim().toUpperCase()) {
+                            Navigator.pop(context);
+                            _updateStatus('delivered', "Verified via QR scan.");
+                            break;
+                          } else {
+                            setModalState(() {
+                              _scannerError = "MISMATCH: Scanned ID ($rawValue) does not match.";
+                            });
+
+                            Future.delayed(const Duration(seconds: 3), () {
+                              if (mounted) setModalState(() => _scannerError = "");
+                            });
+                          }
+                        }
                       }
-                    }
-                  },
+                    },
+                  ),
                 ),
               ),
-            ),
             Padding(
               padding: const EdgeInsets.all(24.0),
               child: Column(
@@ -161,7 +195,7 @@ class _ShipmentDetailState extends State<ShipmentDetail> {
           ],
         ),
       ),
-    );
+    ));
   }
 
   void _showSnackBar(String message, Color color) {

@@ -176,8 +176,8 @@ class _AdminDashboardState extends State<AdminDashboard> {
                     top: 0,
                     child: Container(
                       padding: const EdgeInsets.all(4),
-                      decoration: const BoxDecoration(
-                        color: Colors.red,
+                      decoration: BoxDecoration(
+                       color: Theme.of(context).colorScheme.primary,
                         shape: BoxShape.circle,
                       ),
                       constraints: const BoxConstraints(minWidth: 16, minHeight: 16),

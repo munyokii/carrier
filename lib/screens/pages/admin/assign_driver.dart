@@ -26,14 +26,24 @@ class _AssignDriverState extends State<AssignDriver> {
         'updatedAt': FieldValue.serverTimestamp(),
       });
 
-      final historyRef = bookingRef.collection('status_history').doc();
-      batch.set(historyRef, {
+      final customerNotificationRef = bookingRef.collection('status_history').doc();
+      batch.set(customerNotificationRef, {
         'status': 'accepted',
-        'message': 'Driver $driverName assigned by Admin',
+        'message': 'Your shipment has been accepted by driver $driverName',
         'timestamp': FieldValue.serverTimestamp(),
-        'updatedBy': 'Admin',
         'userId': widget.booking.userId,
         'read': false,
+      });
+
+      final driverNotificationRef = FirebaseFirestore.instance.collection('notifications').doc();
+      batch.set(driverNotificationRef, {
+        'receiverId': driverId,
+        'title': 'New Shipment Assigned',
+        'body': 'You have been assigned to shipment ${widget.booking.trackingNumber}',
+        'bookingId': widget.booking.id,
+        'type': 'assignment',
+        'isRead': false,
+        'createdAt': FieldValue.serverTimestamp(),
       });
 
       await batch.commit();

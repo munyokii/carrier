@@ -6,6 +6,7 @@ import 'package:carrier/models/booking_model.dart';
 import 'package:carrier/screens/pages/driver/shipment_detail.dart';
 import 'package:carrier/screens/pages/driver/driver_history.dart';
 import 'package:carrier/screens/pages/driver/driver_wallet.dart';
+import 'package:carrier/screens/pages/driver/driver_notification.dart';
 
 class DriverDashboard extends StatefulWidget {
   const DriverDashboard({super.key});
@@ -137,10 +138,7 @@ class _DriverDashboardState extends State<DriverDashboard> {
           ],
         ),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.notifications_none_outlined, color: Colors.black87),
-            onPressed: () {},
-          ),
+          _buildNotificationIcon(primaryColor),
           IconButton(
             icon: const Icon(Icons.logout_rounded, color: Colors.redAccent),
             onPressed: _showLogoutDialog,
@@ -176,6 +174,43 @@ class _DriverDashboardState extends State<DriverDashboard> {
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildNotificationIcon(Color primaryColor) {
+    return StreamBuilder<QuerySnapshot>(
+      stream: FirebaseFirestore.instance
+          .collection('notifications')
+          .where('receiverId', isEqualTo: _currentUid)
+          .where('isRead', isEqualTo: false)
+          .snapshots(),
+      builder: (context, snapshot) {
+        int unreadCount = 0;
+        if (snapshot.hasData) {
+          unreadCount = snapshot.data!.docs.length;
+        }
+
+        return Padding(
+          padding: const EdgeInsets.only(top: 8, right: 8),
+          child: Badge(
+            label: Text('$unreadCount', style: const TextStyle(fontSize: 10)),
+            isLabelVisible: unreadCount > 0,
+            backgroundColor: primaryColor,
+            offset: const Offset(-4, 4), 
+            child: IconButton(
+              constraints: const BoxConstraints(),
+              padding: const EdgeInsets.all(4), 
+              icon: const Icon(Icons.notifications_none_outlined, color: Colors.black87, size: 28),
+              onPressed: () {
+                Navigator.push(
+                  context, 
+                  MaterialPageRoute(builder: (context) => const DriverNotifications())
+                );
+              },
+            ),
+          ),
+        );
+      },
     );
   }
 
@@ -268,11 +303,10 @@ class _DriverDashboardState extends State<DriverDashboard> {
       ),
       child: Padding(
         padding: const EdgeInsets.all(16),
-        // Use SingleChildScrollView to catch minor layout variations
         child: SingleChildScrollView( 
           physics: const NeverScrollableScrollPhysics(), 
           child: Column(
-            mainAxisSize: MainAxisSize.min, // Ensure it only takes needed space
+            mainAxisSize: MainAxisSize.min,
             children: [
               Row(
                 children: [

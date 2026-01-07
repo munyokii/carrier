@@ -17,10 +17,15 @@ class _ShipmentDetailState extends State<ShipmentDetail> {
   String _scannerError = "";
   final TextEditingController _manualEntryController = TextEditingController();
 
+  late Stream<DocumentSnapshot> _bookingStream;
+
   @override
-  void dispose() {
-    _manualEntryController.dispose();
-    super.dispose();
+  void initState() {
+    super.initState();
+    _bookingStream = FirebaseFirestore.instance
+        .collection('bookings')
+        .doc(widget.booking.id)
+        .snapshots();
   }
 
   Future<void> _makePhoneCall(String phoneNumber) async {
@@ -208,34 +213,44 @@ class _ShipmentDetailState extends State<ShipmentDetail> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final status = widget.booking.status;
 
-    return Scaffold(
-      backgroundColor: Colors.grey[50],
-      appBar: AppBar(
-        title: const Text("Shipment Details", style: TextStyle(fontWeight: FontWeight.bold)),
-        centerTitle: true,
-      ),
-      body: Column(
-        children: [
-          Expanded(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _buildStatusBanner(status, theme),
-                  const SizedBox(height: 20),
-                  _buildAddressCard(),
-                  const SizedBox(height: 20),
-                  _buildItemCard(),
-                ],
-              ),
-            ),
+    return StreamBuilder<DocumentSnapshot>(
+      stream: _bookingStream,
+      builder: (context, snapshot) {
+        if (snapshot.hasError) return const Scaffold(body: Center(child: Text("Something went wrong")));
+        if (!snapshot.hasData) return const Scaffold(body: Center(child: CircularProgressIndicator()));
+
+        final bookingData = snapshot.data!.data() as Map<String, dynamic>;
+        final currentStatus = bookingData['status'] ?? widget.booking.status;
+
+        return Scaffold(
+          backgroundColor: Colors.grey[50],
+          appBar: AppBar(
+            title: const Text("Shipment Details", style: TextStyle(fontWeight: FontWeight.bold)),
+            centerTitle: true,
           ),
-          _buildBottomAction(status, theme),
-        ],
-      ),
+          body: Column(
+            children: [
+              Expanded(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildStatusBanner(currentStatus, theme),
+                      const SizedBox(height: 20),
+                      _buildAddressCard(),
+                      const SizedBox(height: 20),
+                      _buildItemCard(),
+                    ],
+                  ),
+                ),
+              ),
+              _buildBottomAction(currentStatus, theme),
+            ],
+          ),
+        );
+      },
     );
   }
 
@@ -344,6 +359,9 @@ class _ShipmentDetailState extends State<ShipmentDetail> {
 
   Widget _buildBottomAction(String status, ThemeData theme) {
     bool isOut = status == 'out_for_delivery';
+    bool isDelivered = status == 'delivered';
+
+    if (isDelivered) return const SizedBox.shrink();
     
     return Container(
       padding: const EdgeInsets.all(20),
@@ -363,17 +381,14 @@ class _ShipmentDetailState extends State<ShipmentDetail> {
           : Icon(isOut ? Icons.qr_code_scanner : Icons.local_shipping),
         onPressed: _isUpdating ? null : () {
           if (status == 'accepted') {
-            _updateStatus('out_for_delivery', "Driver ${widget.booking.carrierName} started delivery for ${widget.booking.trackingNumber}");
+            _updateStatus('out_for_delivery', "Driver started delivery.");
           } else if (isOut) {
             _openScanner(); 
           }
         },
         label: _isUpdating 
           ? const CircularProgressIndicator(color: Colors.white)
-          : Text(
-              isOut ? "VERIFY & COMPLETE" : "START DELIVERY",
-              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-            ),
+          : Text(isOut ? "VERIFY & COMPLETE" : "START DELIVERY"),
       ),
     );
   }

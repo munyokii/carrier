@@ -9,7 +9,6 @@ class StationDetail extends StatelessWidget {
 
   const StationDetail({super.key, required this.stationId, required this.stationData});
 
-  // --- NEW: LOGIC TO ASSIGN DRIVER ---
   void _showAssignDriverSheet(BuildContext context) {
     final primaryColor = Theme.of(context).colorScheme.primary;
 
@@ -31,22 +30,31 @@ class StationDetail extends StatelessWidget {
             ),
             Expanded(
               child: StreamBuilder<QuerySnapshot>(
-                // Fetch drivers who are NOT currently at this station
                 stream: FirebaseFirestore.instance
                     .collection('drivers')
                     .where('status', isEqualTo: 'active')
+                    .where('stationId', whereIn: ['', null])
                     .snapshots(),
                 builder: (context, snapshot) {
+                  if (snapshot.hasError) {
+                    return Center(child: Text("Error: ${snapshot.error}"));
+                  }
+                  
                   if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
                   
-                  // Filter locally to find drivers available for transfer or newly active
-                  final availableDrivers = snapshot.data!.docs.where((doc) {
-                    final data = doc.data() as Map<String, dynamic>;
-                    return data['stationId'] != stationId;
-                  }).toList();
+                  final availableDrivers = snapshot.data!.docs;
 
                   if (availableDrivers.isEmpty) {
-                    return const Center(child: Text("No available drivers found."));
+                    return const Center(
+                      child: Padding(
+                        padding: EdgeInsets.all(20.0),
+                        child: Text(
+                          "No unassigned drivers available.\nAll active drivers are currently at a station.",
+                          textAlign: TextAlign.center,
+                          style: TextStyle(color: Colors.grey),
+                        ),
+                      ),
+                    );
                   }
 
                   return ListView.builder(
@@ -59,7 +67,7 @@ class StationDetail extends StatelessWidget {
                       return ListTile(
                         leading: CircleAvatar(
                           backgroundColor: primaryColor.withOpacity(0.1),
-                          child: Text(driver['fullName'][0]),
+                          child: Text(driver['fullName'][0].toUpperCase(), style: TextStyle(color: primaryColor)),
                         ),
                         title: Text(driver['fullName']),
                         subtitle: Text("${driver['vehicleType']} • ${driver['experienceYears']}y Exp"),
@@ -105,7 +113,6 @@ class StationDetail extends StatelessWidget {
         backgroundColor: Colors.white,
         foregroundColor: Colors.black,
         actions: [
-          // ADD DRIVER BUTTON IN APP BAR
           TextButton.icon(
             onPressed: () => _showAssignDriverSheet(context),
             icon: const Icon(Icons.person_add_alt_1, size: 18),
@@ -118,7 +125,6 @@ class StationDetail extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // 1. INTERACTIVE MAP HEADER
             SizedBox(
               height: 250,
               child: FlutterMap(

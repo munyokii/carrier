@@ -33,27 +33,20 @@ class StationDetail extends StatelessWidget {
                 stream: FirebaseFirestore.instance
                     .collection('drivers')
                     .where('status', isEqualTo: 'active')
-                    .where('stationId', whereIn: ['', null])
+                    .where('stationId', isEqualTo: '')
                     .snapshots(),
                 builder: (context, snapshot) {
-                  if (snapshot.hasError) {
-                    return Center(child: Text("Error: ${snapshot.error}"));
-                  }
-                  
+                  if (snapshot.hasError) return Center(child: Text("Error loading drivers"));
                   if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
                   
-                  final availableDrivers = snapshot.data!.docs;
+                  final availableDrivers = snapshot.data!.docs.where((doc) {
+                    final data = doc.data() as Map<String, dynamic>;
+                    return data['stationId'] == '' || data['stationId'] == null;
+                  }).toList();
 
                   if (availableDrivers.isEmpty) {
                     return const Center(
-                      child: Padding(
-                        padding: EdgeInsets.all(20.0),
-                        child: Text(
-                          "No unassigned drivers available.\nAll active drivers are currently at a station.",
-                          textAlign: TextAlign.center,
-                          style: TextStyle(color: Colors.grey),
-                        ),
-                      ),
+                      child: Text("No available drivers found.", style: TextStyle(color: Colors.grey)),
                     );
                   }
 
@@ -67,7 +60,8 @@ class StationDetail extends StatelessWidget {
                       return ListTile(
                         leading: CircleAvatar(
                           backgroundColor: primaryColor.withOpacity(0.1),
-                          child: Text(driver['fullName'][0].toUpperCase(), style: TextStyle(color: primaryColor)),
+                          child: Text(driver['fullName'][0].toUpperCase(), 
+                              style: TextStyle(color: primaryColor, fontWeight: FontWeight.bold)),
                         ),
                         title: Text(driver['fullName']),
                         subtitle: Text("${driver['vehicleType']} • ${driver['experienceYears']}y Exp"),
@@ -79,12 +73,7 @@ class StationDetail extends StatelessWidget {
                                 .doc(doc.id)
                                 .update({'stationId': stationId});
                             
-                            if (context.mounted) {
-                              Navigator.pop(context);
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(content: Text("${driver['fullName']} assigned to ${stationData['stationName']}"))
-                              );
-                            }
+                            if (context.mounted) Navigator.pop(context);
                           },
                         ),
                       );

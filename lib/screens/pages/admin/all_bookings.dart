@@ -7,6 +7,7 @@ import 'package:intl/intl.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class AllBookings extends StatefulWidget {
   const AllBookings({super.key});
@@ -23,6 +24,53 @@ class _AllBookingsState extends State<AllBookings> {
   void dispose() {
     _searchController.dispose();
     super.dispose();
+  }
+
+  Future<void> _contactRecipient(String? phone, {required bool isWhatsapp}) async {
+    if (phone == null || phone.isEmpty) return;
+
+    final cleanPhone = phone.replaceAll(RegExp(r'[^\d]'), '');
+
+    final Uri url = isWhatsapp
+        ? Uri.parse("whatsapp://send?phone=$cleanPhone&text=${Uri.encodeComponent("Hello, your Swiftline package is ready for pickup.")}")
+        : Uri.parse("tel:$phone");
+
+    try {
+      if (await canLaunchUrl(url)) {
+        await launchUrl(
+          url,
+          mode: LaunchMode.externalApplication,
+        );
+      } else {
+        if (isWhatsapp) {
+          final webUrl = Uri.parse("https://wa.me/$cleanPhone");
+          await launchUrl(webUrl, mode: LaunchMode.externalApplication);
+        }
+      }
+    } catch (e) {
+      debugPrint("Could not launch $url: $e");
+    }
+  }
+
+  Future<void> _markAsPicked(BookingModel booking) async {
+    try {
+      final docRef = FirebaseFirestore.instance.collection('bookings').doc(booking.id);
+      await docRef.update({'status': 'picked'});
+      await docRef.collection('status_history').add({
+        'message': 'Package picked up/checked out by recipient',
+        'timestamp': FieldValue.serverTimestamp(),
+        'status': 'picked',
+      });
+      
+      if (mounted) {
+        Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Checkout Complete: Package marked as Picked")),
+        );
+      }
+    } catch (e) {
+      debugPrint("Update error: $e");
+    }
   }
 
   Future<void> _printQrLabel(BookingModel booking) async {
@@ -56,7 +104,7 @@ class _AllBookingsState extends State<AllBookings> {
   @override
   Widget build(BuildContext context) {
     return DefaultTabController(
-      length: 4,
+      length: 5,
       child: Scaffold(
         backgroundColor: const Color(0xFFF8F9FA),
         appBar: AppBar(
@@ -69,7 +117,6 @@ class _AllBookingsState extends State<AllBookings> {
             preferredSize: const Size.fromHeight(115), 
             child: Column(
               children: [
-                // SEARCH BAR PADDING FIX
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
                   child: TextField(
@@ -100,9 +147,9 @@ class _AllBookingsState extends State<AllBookings> {
                     ),
                   ),
                 ),
-                // CENTERED NAVIGATION TAB BAR
+
                 TabBar(
-                  isScrollable: false, // Disabling this centers the tabs automatically
+                  isScrollable: true,
                   labelColor: Theme.of(context).colorScheme.primary,
                   unselectedLabelColor: Colors.grey[600],
                   indicatorColor: Theme.of(context).colorScheme.primary,
@@ -112,7 +159,8 @@ class _AllBookingsState extends State<AllBookings> {
                   tabs: const [
                     Tab(text: "Pending"),
                     Tab(text: "Accepted"),
-                    Tab(text: "Delivered"),
+                    Tab(text: "To Be Picked"),
+                    Tab(text: "Completed"),
                     Tab(text: "Cancelled"),
                   ],
                 ),
@@ -124,7 +172,8 @@ class _AllBookingsState extends State<AllBookings> {
           children: [
             _buildBookingList(statuses: ['pending']),
             _buildBookingList(statuses: ['accepted', 'out_for_delivery']), 
-            _buildBookingList(statuses: ['delivered']), 
+            _buildBookingList(statuses: ['delivered']),
+            _buildBookingList(statuses: ['picked']),
             _buildBookingList(statuses: ['cancelled']),
           ],
         ),
@@ -213,32 +262,25 @@ class _AllBookingsState extends State<AllBookings> {
               const Divider(height: 25, color: Color(0xFFEEEEEE)),
               
               if (booking.status == 'pending')
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Theme.of(context).colorScheme.primary, 
-                      foregroundColor: Colors.white,
-                      elevation: 0,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                    ),
-                    onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (c) => AssignDriver(booking: booking))),
-                    child: const Text("Assign Driver"),
-                  ),
-                )
-              else
+                _buildWideButton("Assign Driver", () => Navigator.push(context, MaterialPageRoute(builder: (c) => AssignDriver(booking: booking))))
+              
+              else if (booking.status == 'delivered')
                 Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text(
-                      booking.status == 'delivered' ? "Delivery Completed" : "Currently En Route", 
-                      style: TextStyle(
-                        color: booking.status == 'delivered' ? Colors.green : Colors.orange[700], 
-                        fontSize: 12, 
-                        fontWeight: FontWeight.bold
-                      )
-                    ), 
-                    const Icon(Icons.chevron_right, size: 18, color: Colors.grey)
+                    _buildContactIcon(Icons.phone, Colors.blue, () => _contactRecipient(booking.recipientPhone, isWhatsapp: false)),
+                    const SizedBox(width: 8),
+                    _buildContactIcon(Icons.message, Colors.green, () => _contactRecipient(booking.recipientPhone, isWhatsapp: true)),
+                    const SizedBox(width: 12),
+                    Expanded(child: _buildWideButton("Confirm Pickup", () => _showBookingDetails(context, booking), color: Colors.orange[800])),
+                  ],
+                )
+              
+              else
+                const Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    Text("View Details", style: TextStyle(fontSize: 12, color: Colors.grey)),
+                    Icon(Icons.chevron_right, size: 16, color: Colors.grey),
                   ],
                 ),
             ],
@@ -273,7 +315,47 @@ class _AllBookingsState extends State<AllBookings> {
               _buildDetailRow("Carrier", booking.carrierName),
               const SizedBox(height: 20),
               _buildStatusHistory(booking.id),
-              const SizedBox(height: 30),
+              const Divider(height: 40, color: Color(0xFFF5F5F5)),
+              _buildDetailRow("Recipient Phone", booking.recipientPhone),
+
+              const SizedBox(height: 15),
+
+              Row(
+                children: [
+                  Expanded(
+                    child: IconButton.filledTonal(
+                      onPressed: () => _contactRecipient(booking.recipientPhone, isWhatsapp: false),
+                      icon: const Icon(Icons.phone),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: IconButton.filledTonal(
+                      onPressed: () => _contactRecipient(booking.recipientPhone, isWhatsapp: true),
+                      icon: const Icon(Icons.chat_bubble_outline),
+                      color: Colors.green,
+                    ),
+                  ),
+                ],
+              ),
+
+              const SizedBox(height: 20),
+
+              if (booking.status == 'delivered') ...[
+                const Text("RECIPIENT IS AT THE STATION?", style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.grey)),
+                const SizedBox(height: 12),
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Theme.of(context).colorScheme.primary,
+                    foregroundColor: Colors.white,
+                    minimumSize: const Size(double.infinity, 55),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                  onPressed: () => _markAsPicked(booking),
+                  child: const Text("COMPLETE CHECKOUT", style: TextStyle(fontWeight: FontWeight.bold)),
+                ),
+                const SizedBox(height: 12),
+              ],
               ElevatedButton.icon(
                 style: ElevatedButton.styleFrom(
                   minimumSize: const Size(double.infinity, 55),
@@ -291,6 +373,27 @@ class _AllBookingsState extends State<AllBookings> {
       ),
     );
   }
+
+  Widget _buildWideButton(String text, VoidCallback onPressed, {Color? color}) {
+    return ElevatedButton(
+      style: ElevatedButton.styleFrom(
+        backgroundColor: color ?? Theme.of(context).colorScheme.primary,
+        foregroundColor: Colors.white,
+        elevation: 0,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      ),
+      onPressed: onPressed,
+      child: Text(text),
+    );
+  }
+
+  Widget _buildContactIcon(IconData icon, Color color, VoidCallback onTap) {
+    return Container(
+      decoration: BoxDecoration(color: color.withOpacity(0.1), borderRadius: BorderRadius.circular(10)),
+      child: IconButton(onPressed: onTap, icon: Icon(icon, color: color, size: 20)),
+    );
+  }
+
 
   Widget _buildStatusHistory(String bookingId) {
     return StreamBuilder<QuerySnapshot>(
@@ -328,6 +431,7 @@ class _AllBookingsState extends State<AllBookings> {
     Color color;
     switch (booking.status) {
       case 'accepted': color = Colors.green; break;
+      case 'picked': color = Colors.blueAccent; break;
       case 'delivered': color = Colors.blue; break;
       case 'cancelled': color = Colors.red; break;
       case 'out_for_delivery': color = Colors.purple; break;

@@ -109,13 +109,12 @@ class _LoginScreenState extends State<LoginScreen> {
     final TextEditingController resetController = TextEditingController();
     resetController.text = _emailController.text;
 
-    // Local variable to track loading specifically for this dialog
     bool _isDialogLoading = false;
 
     showDialog(
       context: context,
-      builder: (context) => StatefulBuilder( // 1. Wrap with StatefulBuilder
-        builder: (context, setDialogState) { // 2. Use setDialogState to refresh the dialog
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) {
           return AlertDialog(
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
             title: const Text("Reset Password"),
@@ -126,7 +125,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 const SizedBox(height: 15),
                 TextField(
                   controller: resetController,
-                  enabled: !_isDialogLoading, // Disable input while loading
+                  enabled: !_isDialogLoading,
                   decoration: InputDecoration(
                     hintText: "Email",
                     prefixIcon: const Icon(Icons.email_outlined),
